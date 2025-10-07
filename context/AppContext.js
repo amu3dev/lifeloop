@@ -1,26 +1,168 @@
-import React, { createContext, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Defines the shape of the global data shared across modules.
+const STORAGE_KEY = '@lifeloop/app-context';
+
 const initialState = {
-  userName: 'LifeLoop Explorer',
-  moodLevel: 'balanced',
-  walletBalance: 1200,
-  focusMinutesToday: 35
+  points: 0,
+  streaks: 0,
+  todayMood: '',
+  walletHistory: [],
+  todos: []
 };
 
-// Creates the context object that other components can consume.
-export const AppContext = createContext({
-  state: initialState,
-  setState: () => undefined
-});
+export const AppContext = createContext(null);
 
-// Provides the context value and exposes setters for updates.
 export const AppProvider = ({ children }) => {
   const [state, setState] = useState(initialState);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // Memoizes the provider value to avoid unnecessary re-renders.
-  const value = useMemo(() => ({ state, setState }), [state]);
+  useEffect(() => {
+    const loadState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
 
-  // Wraps children with the context so any module can access global data.
+        if (stored) {
+          const parsed = JSON.parse(stored);
+
+          setState(prev => ({
+            ...prev,
+            ...parsed
+          }));
+        }
+      } catch (error) {
+        console.warn('Failed to load app state', error);
+      } finally {
+        setIsHydrated(true);
+      }
+    };
+
+    loadState();
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(error => {
+      console.warn('Failed to persist app state', error);
+    });
+  }, [state, isHydrated]);
+
+  // Adds points to the running total so modules can reward daily actions.
+  const addPoints = useCallback(amount => {
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+
+    setState(prev => ({
+      ...prev,
+      points: prev.points + safeAmount
+    }));
+  }, []);
+
+  // Resets daily progress and advances the streak to acknowledge completion.
+  const resetDay = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      points: 0,
+      streaks: prev.streaks + 1,
+      todayMood: '',
+      todos: prev.todos.map(todo => ({
+        ...todo,
+        completed: false
+      }))
+    }));
+  }, []);
+
+  // Appends a new record to the wallet history for smart-wallet insights.
+  const addWalletEntry = useCallback(entry => {
+    const nextEntry = entry ?? {};
+
+    setState(prev => ({
+      ...prev,
+      walletHistory: [nextEntry, ...prev.walletHistory]
+    }));
+  }, []);
+
+  // Adds a todo item so focus-flow can track upcoming tasks.
+  const addTodo = useCallback(todo => {
+    if (!todo) {
+      return;
+    }
+
+    const normalizedTodo =
+      typeof todo === 'string'
+        ? { id: Date.now().toString(), title: todo, completed: false }
+        : {
+            id: todo.id ?? Date.now().toString(),
+            title: todo.title ?? '',
+            completed: Boolean(todo.completed)
+          };
+
+    setState(prev => ({
+      ...prev,
+      todos: [...prev.todos, normalizedTodo]
+    }));
+  }, []);
+
+  // Toggles completion status for a tracked todo item.
+  const toggleTodo = useCallback(todoId => {
+    if (!todoId) {
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      todos: prev.todos.map(todo =>
+        todo.id === todoId
+          ? {
+              ...todo,
+              completed: !todo.completed
+            }
+          : todo
+      )
+    }));
+  }, []);
+
+  // Updates the stored mood so the UI mirrors the latest self-report.
+  const setMood = useCallback(mood => {
+    const nextMood = typeof mood === 'string' ? mood : '';
+
+    setState(prev => ({
+      ...prev,
+      todayMood: nextMood
+    }));
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      state,
+      addPoints,
+      resetDay,
+      addWalletEntry,
+      addTodo,
+      toggleTodo,
+      setMood
+    }),
+    [state, addPoints, resetDay, addWalletEntry, addTodo, toggleTodo, setMood]
+  );
+
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};
+
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+
+  if (!context) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+
+  return context;
 };
