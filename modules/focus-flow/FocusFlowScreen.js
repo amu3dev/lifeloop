@@ -43,30 +43,32 @@ const FocusFlowScreen = () => {
 
   useEffect(() => {
     if (!isRunning) {
-      return;
+      return undefined;
     }
 
     const intervalId = setInterval(() => {
-      setRemainingSeconds(prev => {
-        if (prev <= 1) {
-          if (timerPhase === 'focus') {
-            setTimerPhase('break');
-            setRemainingSeconds(BREAK_DURATION);
-            addPoints(5);
-            return BREAK_DURATION;
-          }
-
-          setTimerPhase('focus');
-          setRemainingSeconds(FOCUS_DURATION);
-          return FOCUS_DURATION;
-        }
-
-        return prev - 1;
-      });
+      setRemainingSeconds(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [isRunning, timerPhase, addPoints]);
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
+
+    if (remainingSeconds === 0) {
+      if (timerPhase === 'focus') {
+        addPoints(5);
+        setTimerPhase('break');
+        setRemainingSeconds(BREAK_DURATION);
+      } else {
+        setTimerPhase('focus');
+        setRemainingSeconds(FOCUS_DURATION);
+      }
+    }
+  }, [remainingSeconds, timerPhase, isRunning, addPoints]);
 
   const handleAddTodo = useCallback(() => {
     const trimmed = newTodo.trim();
