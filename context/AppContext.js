@@ -112,6 +112,37 @@ export const AppProvider = ({ children }) => {
     }));
   }, []);
 
+  // Updates an existing todo item, enabling rename or status adjustments.
+  const updateTodo = useCallback((todoId, updates) => {
+    if (!todoId || !updates) {
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      todos: prev.todos.map(todo =>
+        todo.id === todoId
+          ? {
+              ...todo,
+              ...updates
+            }
+          : todo
+      )
+    }));
+  }, []);
+
+  // Removes a todo item so the list supports full CRUD interactions.
+  const removeTodo = useCallback(todoId => {
+    if (!todoId) {
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      todos: prev.todos.filter(todo => todo.id !== todoId)
+    }));
+  }, []);
+
   // Toggles completion status for a tracked todo item.
   const toggleTodo = useCallback(todoId => {
     if (!todoId) {
@@ -148,10 +179,22 @@ export const AppProvider = ({ children }) => {
       resetDay,
       addWalletEntry,
       addTodo,
+      updateTodo,
+      removeTodo,
       toggleTodo,
       setMood
     }),
-    [state, addPoints, resetDay, addWalletEntry, addTodo, toggleTodo, setMood]
+    [
+      state,
+      addPoints,
+      resetDay,
+      addWalletEntry,
+      addTodo,
+      updateTodo,
+      removeTodo,
+      toggleTodo,
+      setMood
+    ]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
