@@ -9,6 +9,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 // Shared context and components.
 import { AppProvider } from './context/AppContext';
+import HomeScreen from './screens/HomeScreen';
 import MindGymScreen from './modules/mind-gym/MindGymScreen';
 import MealMoodScreen from './modules/meal-mood/MealMoodScreen';
 import SmartWalletScreen from './modules/smart-wallet/SmartWalletScreen';
@@ -44,6 +45,7 @@ const ModuleTabs = ({ initialRouteName }) => (
       tabBarStyle: { backgroundColor: '#0f172a', borderTopWidth: 0 },
       tabBarIcon: ({ color, size }) => {
         const iconMap = {
+          Home: 'dashboard',
           MindGym: 'psychology',
           MealMood: 'restaurant-menu',
           SmartWallet: 'savings',
@@ -52,6 +54,7 @@ const ModuleTabs = ({ initialRouteName }) => (
         return <MaterialIcons name={iconMap[route.name]} size={size} color={color} />;
       }
     })}>
+    <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
     <Tab.Screen name="MindGym" component={MindGymScreen} options={{ title: 'Mind Gym' }} />
     <Tab.Screen name="MealMood" component={MealMoodScreen} options={{ title: 'Meal Mood' }} />
     <Tab.Screen name="SmartWallet" component={SmartWalletScreen} options={{ title: 'Smart Wallet' }} />
@@ -61,7 +64,7 @@ const ModuleTabs = ({ initialRouteName }) => (
 
 // Coordinates persistence of the last visited tab using AsyncStorage.
 const AppNavigation = () => {
-  const [initialTab, setInitialTab] = useState('MindGym');
+  const [initialTab, setInitialTab] = useState('Home');
   const [isBootstrapped, setIsBootstrapped] = useState(false);
 
   useEffect(() => {
