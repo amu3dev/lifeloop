@@ -1,7 +1,11 @@
 {
-  "plugins": [
-    "expo-asset",
-    "expo-font",
-    "expo-status-bar"
-  ]
+  "expo": {
+    "name": "LifeLoop",
+    "slug": "lifeloop",
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-status-bar"
+    ]
+  }
 }

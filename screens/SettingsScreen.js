@@ -3,7 +3,7 @@ import { Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../components/shared/Header';
 import Button from '../components/shared/Button';
-import TimingSettingsForm from '../components/shared/TimingSettingsForm';
+import TimingSettingsForm, { isTimingValid } from '../components/shared/TimingSettingsForm';
 import { useAppContext } from '../context/AppContext';
 import { colors, fontSize, moduleThemes, spacing } from '../theme/theme';
 
@@ -33,7 +33,7 @@ const SettingsScreen = ({ navigation }) => {
           Switching modes can move today's boundary, so check-ins near midnight or Fajr may land on
           a different day.
         </Text>
-        <Button label="Save" onPress={handleSave} theme={theme} />
+        <Button label="Save" onPress={handleSave} theme={theme} disabled={!isTimingValid(timing)} />
         <Button label="Cancel" onPress={() => navigation.goBack()} theme={theme} variant="secondary" />
       </ScrollView>
     </SafeAreaView>

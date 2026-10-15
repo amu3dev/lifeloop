@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  AppState,
   View,
   Text,
   StyleSheet,
@@ -17,6 +18,16 @@ import TextField from '../../components/shared/TextField';
 import ProgressRing from '../../components/shared/ProgressRing';
 import { FOCUS_GOAL_MINUTES, MAX_PRIORITIES, useAppContext } from '../../context/AppContext';
 import {
+  FOCUS_DURATION,
+  advanceTimer,
+  createTimer,
+  getPhaseDuration,
+  getRemainingSeconds,
+  isTimerRunning,
+  pauseTimer,
+  startTimer
+} from '../../lib/focusTimer';
+import {
   colors,
   fontSize,
   moduleThemes,
@@ -26,9 +37,6 @@ import {
 } from '../../theme/theme';
 
 const theme = moduleThemes.FocusFlow;
-
-const FOCUS_DURATION = 25 * 60;
-const BREAK_DURATION = 5 * 60;
 
 const formatTime = seconds => {
   const minutes = Math.floor(seconds / 60)
@@ -66,9 +74,11 @@ const FocusFlowScreen = ({ navigation }) => {
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const [timerPhase, setTimerPhase] = useState('focus');
-  const [remainingSeconds, setRemainingSeconds] = useState(FOCUS_DURATION);
-  const [isRunning, setIsRunning] = useState(false);
+  const [timer, setTimer] = useState(createTimer);
+  const [clock, setClock] = useState(() => Date.now());
+
+  const isRunning = isTimerRunning(timer);
+  const remainingSeconds = getRemainingSeconds(timer, clock);
 
   const openPriorities = today.priorities.filter(priority => !priority.completed);
   // Falls back to the first open priority when the chosen one is done or removed.
@@ -76,34 +86,36 @@ const FocusFlowScreen = ({ navigation }) => {
     ? selectedId
     : openPriorities[0]?.id ?? null;
 
+  // Re-reads the clock while running, and immediately when the app returns to the foreground.
   useEffect(() => {
     if (!isRunning) {
       return undefined;
     }
 
-    const intervalId = setInterval(() => {
-      setRemainingSeconds(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
+    const intervalId = setInterval(() => setClock(Date.now()), 500);
+    const subscription = AppState.addEventListener('change', status => {
+      if (status === 'active') {
+        setClock(Date.now());
+      }
+    });
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      subscription.remove();
+    };
   }, [isRunning]);
 
   useEffect(() => {
-    if (!isRunning) {
+    if (!isRunning || remainingSeconds > 0) {
       return;
     }
 
-    if (remainingSeconds === 0) {
-      if (timerPhase === 'focus') {
-        completeFocusSession({ minutes: FOCUS_DURATION / 60, priorityId: focusTargetId });
-        setTimerPhase('break');
-        setRemainingSeconds(BREAK_DURATION);
-      } else {
-        setTimerPhase('focus');
-        setRemainingSeconds(FOCUS_DURATION);
-      }
+    const { timer: nextTimer, completedFocus } = advanceTimer(timer, Date.now());
+    if (completedFocus) {
+      completeFocusSession({ minutes: FOCUS_DURATION / 60, priorityId: focusTargetId });
     }
-  }, [remainingSeconds, timerPhase, isRunning, completeFocusSession, focusTargetId]);
+    setTimer(nextTimer);
+  }, [isRunning, remainingSeconds, timer, completeFocusSession, focusTargetId]);
 
   // Return-key submits pass the field's own text, which can be newer than `newPriority`.
   const handleAddPriority = useCallback(text => {
@@ -139,16 +151,17 @@ const FocusFlowScreen = ({ navigation }) => {
   }, []);
 
   const handleTimerToggle = useCallback(() => {
-    setIsRunning(prev => !prev);
+    const now = Date.now();
+    setClock(now);
+    setTimer(prev => (isTimerRunning(prev) ? pauseTimer(prev, now) : startTimer(prev, now)));
   }, []);
 
   const handleTimerReset = useCallback(() => {
-    setIsRunning(false);
-    setTimerPhase('focus');
-    setRemainingSeconds(FOCUS_DURATION);
+    setTimer(createTimer());
   }, []);
 
-  const phaseDuration = timerPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+  const timerPhase = timer.phase;
+  const phaseDuration = getPhaseDuration(timer);
   const sessionCount = today.focusSessions.length;
 
   return (

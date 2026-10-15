@@ -9,6 +9,7 @@ import IconButton from '../components/shared/IconButton';
 import { FOCUS_GOAL_MINUTES, useAppContext } from '../context/AppContext';
 import { getMoodOption } from '../lib/checkInOptions';
 import { fromDateKey, getLoopAnchors } from '../lib/loopTime';
+import { getNextAction } from '../lib/nextAction';
 import {
   colors,
   fontSize,
@@ -29,42 +30,6 @@ const getGreeting = date => {
     return 'Good afternoon';
   }
   return 'Good evening';
-};
-
-// Picks the one thing the user should do next in today's loop.
-const getNextAction = ({ today, anchors, now }) => {
-  const nextPriority = today.priorities.find(priority => !priority.completed);
-
-  if (today.review) {
-    return {
-      icon: 'check-circle',
-      label: 'Loop closed',
-      title: 'Nice work. See you tomorrow.',
-      action: null
-    };
-  }
-  if (!today.checkIn) {
-    return {
-      icon: 'wb-twilight',
-      label: now < anchors.checkInAt ? `Check-in opens ${anchors.checkInLabel}` : 'Start your day',
-      title: 'Check in and pick your top 3',
-      action: { label: 'Check in', icon: 'arrow-forward', route: 'CheckIn' }
-    };
-  }
-  if (now >= anchors.reviewAt || !nextPriority) {
-    return {
-      icon: 'nights-stay',
-      label: now >= anchors.reviewAt ? 'Time to wind down' : 'Top 3 done',
-      title: 'Close your day with a quick review',
-      action: { label: 'Review', icon: 'arrow-forward', route: 'Review' }
-    };
-  }
-  return {
-    icon: 'track-changes',
-    label: 'Up next',
-    title: nextPriority.title,
-    action: { label: '25 min', icon: 'play-arrow', route: 'FocusFlow' }
-  };
 };
 
 // "Your day": loop status, the next step, today's top 3, and focus progress.

@@ -15,14 +15,29 @@ const theme = moduleThemes.Loop;
 
 // Evening review: mark what got done and how the day felt, which closes the loop.
 const ReviewScreen = ({ navigation }) => {
-  const { today, dailyContext, togglePriority, submitReview } = useAppContext();
+  const { today, dailyContext, submitReview } = useAppContext();
   const [feeling, setFeeling] = useState(today.review?.feeling);
+  // Ticks stay a draft until "Close the loop", so closing with ✕ changes nothing.
+  const [doneIds, setDoneIds] = useState(
+    () => new Set(today.priorities.filter(priority => priority.completed).map(priority => priority.id))
+  );
 
-  const doneCount = today.priorities.filter(priority => priority.completed).length;
+  const toggleDone = priorityId =>
+    setDoneIds(prev => {
+      const next = new Set(prev);
+      if (next.has(priorityId)) {
+        next.delete(priorityId);
+      } else {
+        next.add(priorityId);
+      }
+      return next;
+    });
+
+  const doneCount = today.priorities.filter(priority => doneIds.has(priority.id)).length;
   const morningMood = getMoodOption(today.checkIn?.mood);
 
   const handleSubmit = () => {
-    submitReview({ feeling });
+    submitReview({ feeling, completedIds: [...doneIds] });
     navigation.goBack();
   };
 
@@ -64,26 +79,28 @@ const ReviewScreen = ({ navigation }) => {
           {today.priorities.length === 0 ? (
             <Text style={styles.hint}>No priorities were set today.</Text>
           ) : (
-            today.priorities.map(priority => (
-              <TouchableOpacity
-                key={priority.id}
-                style={styles.priorityRow}
-                onPress={() => togglePriority(priority.id)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: priority.completed }}
-              >
-                <MaterialIcons
-                  name={priority.completed ? 'check-circle' : 'radio-button-unchecked'}
-                  size={24}
-                  color={priority.completed ? statThemes.todos.fill : colors.border}
-                />
-                <Text
-                  style={[styles.priorityTitle, priority.completed && styles.priorityDone]}
+            today.priorities.map(priority => {
+              const isDone = doneIds.has(priority.id);
+
+              return (
+                <TouchableOpacity
+                  key={priority.id}
+                  style={styles.priorityRow}
+                  onPress={() => toggleDone(priority.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isDone }}
                 >
-                  {priority.title}
-                </Text>
-              </TouchableOpacity>
-            ))
+                  <MaterialIcons
+                    name={isDone ? 'check-circle' : 'radio-button-unchecked'}
+                    size={24}
+                    color={isDone ? statThemes.todos.fill : colors.border}
+                  />
+                  <Text style={[styles.priorityTitle, isDone && styles.priorityDone]}>
+                    {priority.title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })
           )}
         </Card>
 

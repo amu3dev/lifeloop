@@ -38,7 +38,12 @@ const CheckInScreen = ({ navigation }) => {
   const isFull = priorities.length >= MAX_PRIORITIES;
   const draftTitles = new Set(priorities.map(priority => priority.title));
   const suggestions = carryOver.filter(priority => !draftTitles.has(priority.title));
-  const canSubmit = Boolean(energy && mood && sleep && priorities.length > 0);
+  // Text typed but not yet added still counts, so "Start my day" never drops it.
+  const pendingTitle = isFull ? '' : newTitle.trim();
+  const finalPriorities = pendingTitle
+    ? [...priorities, { id: draftId(), title: pendingTitle, effort: newEffort, completed: false }]
+    : priorities;
+  const canSubmit = Boolean(energy && mood && sleep && finalPriorities.length > 0);
 
   const addDraft = (title, effort) => {
     const trimmed = title.trim();
@@ -61,7 +66,7 @@ const CheckInScreen = ({ navigation }) => {
       mood,
       sleep,
       // Drafts get real ids from the context; saved priorities keep theirs.
-      priorities: priorities.map(({ id, ...rest }) =>
+      priorities: finalPriorities.map(({ id, ...rest }) =>
         id.startsWith('draft-') ? rest : { id, ...rest }
       )
     });

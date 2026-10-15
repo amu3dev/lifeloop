@@ -11,7 +11,8 @@ export const colors = {
   heroMuted: '#B4B2A9',
   heroDivider: '#444441',
   streak: '#F0997B',
-  positive: '#97C459'
+  positive: '#97C459',
+  danger: '#A32D2D'
 };
 
 // Accent sets: Loop is the daily check-in/review, FocusFlow is the focus timer.

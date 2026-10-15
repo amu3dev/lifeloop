@@ -13,6 +13,8 @@ import { getLoopDateKey, shiftDateKey } from '../lib/loopTime';
 import { getStreak } from '../lib/streak';
 
 const STORAGE_KEY = '@lifeloop/loop-state-v1';
+// Keys from the four-module version; nothing reads them since the loop redesign.
+const LEGACY_STORAGE_KEYS = ['@lifeloop/app-context', '@lifeloop/meal-mood/latest'];
 
 export const MAX_PRIORITIES = 3;
 export const FOCUS_GOAL_MINUTES = 100;
@@ -71,6 +73,9 @@ export const AppProvider = ({ children }) => {
     };
 
     loadState();
+    AsyncStorage.multiRemove(LEGACY_STORAGE_KEYS).catch(error => {
+      console.warn('Failed to clear legacy state', error);
+    });
   }, []);
 
   useEffect(() => {
@@ -181,10 +186,17 @@ export const AppProvider = ({ children }) => {
     );
   }, []);
 
-  const submitReview = useCallback(({ feeling }) => {
+  // Closes the day; `completedIds`, when given, sets which priorities are done.
+  const submitReview = useCallback(({ feeling, completedIds }) => {
     setState(prev =>
       updateToday(prev, day => ({
         ...day,
+        priorities: completedIds
+          ? day.priorities.map(priority => ({
+              ...priority,
+              completed: completedIds.includes(priority.id)
+            }))
+          : day.priorities,
         review: { at: new Date().toISOString(), feeling }
       }))
     );

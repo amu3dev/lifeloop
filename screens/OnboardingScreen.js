@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import Button from '../components/shared/Button';
-import TimingSettingsForm from '../components/shared/TimingSettingsForm';
+import TimingSettingsForm, { isTimingValid } from '../components/shared/TimingSettingsForm';
 import { useAppContext } from '../context/AppContext';
 import { colors, fontSize, moduleThemes, radius, spacing } from '../theme/theme';
 
@@ -55,6 +55,7 @@ const OnboardingScreen = () => {
           icon="arrow-forward"
           onPress={() => completeOnboarding(timing)}
           theme={theme}
+          disabled={!isTimingValid(timing)}
         />
       </ScrollView>
     </SafeAreaView>

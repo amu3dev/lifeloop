@@ -3,7 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import OptionChips from './OptionChips';
 import { CITIES } from '../../lib/cities';
-import { formatClock, formatTime, getPrayerTimes, shiftTime } from '../../lib/loopTime';
+import {
+  formatClock,
+  formatTime,
+  getPrayerTimes,
+  isValidFixedWindow,
+  shiftTime
+} from '../../lib/loopTime';
 import { colors, fontSize, radius, spacing } from '../../theme/theme';
 
 const MODES = [
@@ -44,6 +50,10 @@ const TimeStepper = ({ label, value, onChange, theme }) => (
     </View>
   </View>
 );
+
+// Whether the form's current values can be saved.
+export const isTimingValid = value =>
+  value.timingMode !== 'fixed' || isValidFixedWindow(value.wakeTime, value.windDownTime);
 
 // Lets the user choose how the loop is timed: fixed clock times or prayer times.
 const TimingSettingsForm = ({ value, onChange, theme }) => {
@@ -97,7 +107,13 @@ const TimingSettingsForm = ({ value, onChange, theme }) => {
             onChange={windDownTime => update({ windDownTime })}
             theme={theme}
           />
-          <Text style={styles.hint}>Late nights until 4:00 AM still count toward the same day.</Text>
+          {isValidFixedWindow(value.wakeTime, value.windDownTime) ? (
+            <Text style={styles.hint}>Late nights until 4:00 AM still count toward the same day.</Text>
+          ) : (
+            <Text style={styles.error}>
+              Wind down has to come after your day starts (the day runs 4:00 AM to 4:00 AM).
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.detailCard}>
@@ -190,6 +206,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.caption,
     lineHeight: 17,
     color: colors.inkMuted
+  },
+  error: {
+    fontSize: fontSize.caption,
+    lineHeight: 17,
+    fontWeight: '600',
+    color: colors.danger
   }
 });
 
