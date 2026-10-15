@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -10,17 +10,19 @@ import { MaterialIcons } from '@expo/vector-icons';
 // Shared context and components.
 import { AppProvider, useAppContext } from './context/AppContext';
 import HomeScreen from './screens/HomeScreen';
-import MindGymScreen from './modules/mind-gym/MindGymScreen';
-import MealMoodScreen from './modules/meal-mood/MealMoodScreen';
-import SmartWalletScreen from './modules/smart-wallet/SmartWalletScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
+import CheckInScreen from './screens/CheckInScreen';
+import ReviewScreen from './screens/ReviewScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import FocusFlowScreen from './modules/focus-flow/FocusFlowScreen';
 import BottomNav from './components/shared/BottomNav';
-import { colors, moduleThemes } from './theme/theme';
+import { colors, fontSize, moduleThemes, spacing } from './theme/theme';
 
 // Configures navigation primitives for the app shell.
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const LAST_TAB_KEY = 'lifeloop:last-tab';
+const TAB_NAMES = ['Home', 'FocusFlow'];
 
 // Resolves the active route name from nested navigation state.
 const getActiveRouteName = (state) => {
@@ -34,7 +36,7 @@ const getActiveRouteName = (state) => {
   return route.name;
 };
 
-// Renders the bottom tab navigator with four modules and iconography.
+// Renders the two tabs: today's loop and the focus timer.
 const ModuleTabs = ({ initialRouteName }) => (
   <Tab.Navigator
     initialRouteName={initialRouteName}
@@ -46,34 +48,34 @@ const ModuleTabs = ({ initialRouteName }) => (
       tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, elevation: 0 },
       tabBarIcon: ({ color, size }) => {
         const iconMap = {
-          Home: 'home',
-          MindGym: 'psychology',
-          MealMood: 'restaurant-menu',
-          SmartWallet: 'account-balance-wallet',
+          Home: 'wb-sunny',
           FocusFlow: 'hourglass-empty'
         };
         return <MaterialIcons name={iconMap[route.name]} size={size} color={color} />;
       }
     })}>
-    <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-    <Tab.Screen name="MindGym" component={MindGymScreen} options={{ title: 'Mind' }} />
-    <Tab.Screen name="MealMood" component={MealMoodScreen} options={{ title: 'Meals' }} />
-    <Tab.Screen name="SmartWallet" component={SmartWalletScreen} options={{ title: 'Wallet' }} />
+    <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Today' }} />
     <Tab.Screen name="FocusFlow" component={FocusFlowScreen} options={{ title: 'Focus' }} />
   </Tab.Navigator>
 );
 
 // Coordinates persistence of the last visited tab using AsyncStorage.
 const AppNavigation = () => {
-  const { isHydrated } = useAppContext();
+  const { isHydrated, state } = useAppContext();
   const [initialTab, setInitialTab] = useState('Home');
   const [isBootstrapped, setIsBootstrapped] = useState(false);
+  // A user who onboards in this launch starts on Today, not a tab saved by an older version.
+  const onboardedAtLaunch = useRef(null);
+  if (isHydrated && onboardedAtLaunch.current === null) {
+    onboardedAtLaunch.current = state.settings.onboarded;
+  }
 
   useEffect(() => {
     const loadLastTab = async () => {
       try {
         const savedTab = await AsyncStorage.getItem(LAST_TAB_KEY);
-        if (savedTab) {
+        // Ignores tabs that no longer exist and non-tab routes such as CheckIn.
+        if (TAB_NAMES.includes(savedTab)) {
           setInitialTab(savedTab);
         }
       } finally {
@@ -85,7 +87,7 @@ const AppNavigation = () => {
 
   const handleStateChange = async (state) => {
     const currentRoute = getActiveRouteName(state);
-    if (currentRoute) {
+    if (TAB_NAMES.includes(currentRoute)) {
       await AsyncStorage.setItem(LAST_TAB_KEY, currentRoute);
     }
   };
@@ -102,11 +104,24 @@ const AppNavigation = () => {
 
   return (
     <NavigationContainer onStateChange={handleStateChange}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="LifeLoopTabs">
-          {() => <ModuleTabs initialRouteName={initialTab} />}
-        </Stack.Screen>
+        {state.settings.onboarded ? (
+          <>
+            <Stack.Screen name="LifeLoopTabs">
+              {() => (
+                <ModuleTabs initialRouteName={onboardedAtLaunch.current ? initialTab : 'Home'} />
+              )}
+            </Stack.Screen>
+            <Stack.Group screenOptions={{ presentation: 'modal' }}>
+              <Stack.Screen name="CheckIn" component={CheckInScreen} />
+              <Stack.Screen name="Review" component={ReviewScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+            </Stack.Group>
+          </>
+        ) : (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -127,12 +142,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f172a'
+    backgroundColor: colors.background
   },
   loaderText: {
-    marginTop: 12,
-    color: '#e2e8f0',
-    fontSize: 15
+    marginTop: spacing.md,
+    color: colors.inkMuted,
+    fontSize: fontSize.body
   }
 });
 

@@ -14,11 +14,9 @@ export const colors = {
   positive: '#97C459'
 };
 
-// Gives each module its own accent so they are easy to tell apart.
+// Accent sets: Loop is the daily check-in/review, FocusFlow is the focus timer.
 export const moduleThemes = {
-  MindGym: { background: '#EEEDFE', accent: '#534AB7', ink: '#26215C' },
-  MealMood: { background: '#FAECE7', accent: '#993C1D', ink: '#4A1B0C' },
-  SmartWallet: { background: '#E1F5EE', accent: '#0F6E56', ink: '#04342C' },
+  Loop: { background: '#EDEBE4', accent: '#1C1C1A', ink: '#1C1C1A' },
   FocusFlow: { background: '#E6F1FB', accent: '#185FA5', ink: '#042C53' }
 };
 

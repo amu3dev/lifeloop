@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,10 @@ import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
 import Card from '../../components/shared/Card';
 import Button from '../../components/shared/Button';
+import OptionChips from '../../components/shared/OptionChips';
 import TextField from '../../components/shared/TextField';
 import ProgressRing from '../../components/shared/ProgressRing';
-import { useAppContext } from '../../context/AppContext';
+import { FOCUS_GOAL_MINUTES, MAX_PRIORITIES, useAppContext } from '../../context/AppContext';
 import {
   colors,
   fontSize,
@@ -37,7 +38,7 @@ const formatTime = seconds => {
   return `${minutes}:${remainingSeconds}`;
 };
 
-// Small icon-only button for todo row actions.
+// Small icon-only button for priority row actions.
 const IconAction = ({ icon, label, onPress, color = colors.inkSubtle }) => (
   <TouchableOpacity
     style={styles.iconAction}
@@ -50,23 +51,30 @@ const IconAction = ({ icon, label, onPress, color = colors.inkSubtle }) => (
   </TouchableOpacity>
 );
 
-// Runs a todo-driven Pomodoro loop that syncs streaks with the global context.
-const FocusFlowScreen = () => {
+// Pomodoro timer that logs each finished block against one of today's top 3.
+const FocusFlowScreen = ({ navigation }) => {
   const {
-    state,
-    addTodo,
-    updateTodo,
-    removeTodo,
-    toggleTodo,
-    completeFocusSession,
-    resetDay
+    today,
+    dailyContext,
+    addPriority,
+    updatePriority,
+    removePriority,
+    togglePriority,
+    completeFocusSession
   } = useAppContext();
-  const [newTodo, setNewTodo] = useState('');
+  const [newPriority, setNewPriority] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
   const [timerPhase, setTimerPhase] = useState('focus');
   const [remainingSeconds, setRemainingSeconds] = useState(FOCUS_DURATION);
   const [isRunning, setIsRunning] = useState(false);
+
+  const openPriorities = today.priorities.filter(priority => !priority.completed);
+  // Falls back to the first open priority when the chosen one is done or removed.
+  const focusTargetId = openPriorities.some(priority => priority.id === selectedId)
+    ? selectedId
+    : openPriorities[0]?.id ?? null;
 
   useEffect(() => {
     if (!isRunning) {
@@ -87,7 +95,7 @@ const FocusFlowScreen = () => {
 
     if (remainingSeconds === 0) {
       if (timerPhase === 'focus') {
-        completeFocusSession();
+        completeFocusSession({ minutes: FOCUS_DURATION / 60, priorityId: focusTargetId });
         setTimerPhase('break');
         setRemainingSeconds(BREAK_DURATION);
       } else {
@@ -95,55 +103,40 @@ const FocusFlowScreen = () => {
         setRemainingSeconds(FOCUS_DURATION);
       }
     }
-  }, [remainingSeconds, timerPhase, isRunning, completeFocusSession]);
+  }, [remainingSeconds, timerPhase, isRunning, completeFocusSession, focusTargetId]);
 
-  const handleAddTodo = useCallback(() => {
-    const trimmed = newTodo.trim();
+  // Return-key submits pass the field's own text, which can be newer than `newPriority`.
+  const handleAddPriority = useCallback(text => {
+    const trimmed = (typeof text === 'string' ? text : newPriority).trim();
 
     if (!trimmed) {
       return;
     }
 
-    addTodo({ title: trimmed, completed: false });
-    setNewTodo('');
-  }, [newTodo, addTodo]);
+    addPriority(trimmed);
+    setNewPriority('');
+  }, [newPriority, addPriority]);
 
-  const handleStartEdit = useCallback(todo => {
-    setEditingId(todo.id);
-    setEditingValue(todo.title);
+  const handleStartEdit = useCallback(priority => {
+    setEditingId(priority.id);
+    setEditingValue(priority.title);
   }, []);
 
   const handleSaveEdit = useCallback(() => {
     const trimmed = editingValue.trim();
 
-    if (!trimmed || !editingId) {
-      setEditingId(null);
-      setEditingValue('');
-      return;
+    if (trimmed && editingId) {
+      updatePriority(editingId, { title: trimmed });
     }
 
-    updateTodo(editingId, { title: trimmed });
     setEditingId(null);
     setEditingValue('');
-  }, [editingId, editingValue, updateTodo]);
+  }, [editingId, editingValue, updatePriority]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingId(null);
     setEditingValue('');
   }, []);
-
-  const allTodosComplete = useMemo(
-    () => state.todos.length > 0 && state.todos.every(todo => todo.completed),
-    [state.todos]
-  );
-
-  const streakMessage = useMemo(() => {
-    if (allTodosComplete) {
-      return `Loop complete! Current streak: ${state.streaks}. Use reset to start a new day.`;
-    }
-
-    return `Current streak: ${state.streaks}. Complete todos to keep momentum.`;
-  }, [allTodosComplete, state.streaks]);
 
   const handleTimerToggle = useCallback(() => {
     setIsRunning(prev => !prev);
@@ -155,12 +148,8 @@ const FocusFlowScreen = () => {
     setRemainingSeconds(FOCUS_DURATION);
   }, []);
 
-  const handleResetDay = useCallback(() => {
-    resetDay();
-    handleTimerReset();
-  }, [resetDay, handleTimerReset]);
-
   const phaseDuration = timerPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+  const sessionCount = today.focusSessions.length;
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
@@ -170,7 +159,7 @@ const FocusFlowScreen = () => {
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <Header title="Focus Flow" subtitle="Move through deep work with ease" theme={theme} />
+        <Header title="Focus" subtitle="Work through today's top 3" theme={theme} />
         <Card style={styles.timerCard}>
           <ProgressRing
             progress={remainingSeconds / phaseDuration}
@@ -184,6 +173,25 @@ const FocusFlowScreen = () => {
             </Text>
             <Text style={styles.timerValue}>{formatTime(remainingSeconds)}</Text>
           </ProgressRing>
+          {openPriorities.length > 1 ? (
+            <View style={styles.targetBlock}>
+              <Text style={styles.targetLabel}>Focusing on</Text>
+              <OptionChips
+                options={openPriorities.map(priority => ({
+                  value: priority.id,
+                  label: priority.title
+                }))}
+                value={focusTargetId}
+                onChange={setSelectedId}
+                theme={theme}
+                style={styles.targetChips}
+              />
+            </View>
+          ) : openPriorities.length === 1 ? (
+            <Text style={styles.targetSingle} numberOfLines={1}>
+              Focusing on {openPriorities[0].title}
+            </Text>
+          ) : null}
           <View style={styles.timerControls}>
             <Button
               label={isRunning ? 'Pause' : 'Start'}
@@ -201,44 +209,52 @@ const FocusFlowScreen = () => {
             />
           </View>
         </Card>
-        <Text style={styles.sectionTitle}>Todo loop</Text>
+        <Text style={styles.sectionTitle}>Today's top {MAX_PRIORITIES}</Text>
         <Card>
-          <View style={styles.addRow}>
-            <TextField
-              style={styles.input}
-              placeholder="Add a focus task"
-              value={newTodo}
-              onChangeText={setNewTodo}
-              onSubmitEditing={handleAddTodo}
-            />
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddTodo}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Add todo"
-            >
-              <MaterialIcons name="add" size={22} color={colors.surface} />
-            </TouchableOpacity>
-          </View>
-          {state.todos.map(todo => {
-            const isEditing = editingId === todo.id;
+          {today.priorities.length < MAX_PRIORITIES ? (
+            <View style={styles.addRow}>
+              <TextField
+                style={styles.input}
+                placeholder="Add a priority"
+                value={newPriority}
+                onChangeText={setNewPriority}
+                onSubmitEditing={event => handleAddPriority(event.nativeEvent.text)}
+              />
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => handleAddPriority()}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Add priority"
+              >
+                <MaterialIcons name="add" size={22} color={colors.surface} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {today.priorities.map((priority, index) => {
+            const isEditing = editingId === priority.id;
+            const hasDivider = index > 0 || today.priorities.length < MAX_PRIORITIES;
 
             return (
-              <View key={todo.id} style={styles.todoItem}>
+              <View
+                key={priority.id}
+                style={[styles.priorityItem, hasDivider && styles.priorityDivider]}
+              >
                 <TouchableOpacity
-                  style={styles.todoToggle}
-                  onPress={() => toggleTodo(todo.id)}
+                  style={styles.priorityToggle}
+                  onPress={() => togglePriority(priority.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: priority.completed }}
                 >
                   <MaterialIcons
-                    name={todo.completed ? 'check-circle' : 'radio-button-unchecked'}
+                    name={priority.completed ? 'check-circle' : 'radio-button-unchecked'}
                     size={24}
-                    color={todo.completed ? statThemes.todos.fill : colors.border}
+                    color={priority.completed ? statThemes.todos.fill : colors.border}
                   />
                 </TouchableOpacity>
                 {isEditing ? (
                   <TextField
-                    style={styles.todoInput}
+                    style={styles.priorityInput}
                     value={editingValue}
                     onChangeText={setEditingValue}
                     autoFocus
@@ -246,14 +262,14 @@ const FocusFlowScreen = () => {
                 ) : (
                   <Text
                     style={[
-                      styles.todoText,
-                      todo.completed && styles.todoTextCompleted
+                      styles.priorityText,
+                      priority.completed && styles.priorityTextCompleted
                     ]}
                   >
-                    {todo.title}
+                    {priority.title}
                   </Text>
                 )}
-                <View style={styles.todoActions}>
+                <View style={styles.priorityActions}>
                   {isEditing ? (
                     <>
                       <IconAction
@@ -269,12 +285,12 @@ const FocusFlowScreen = () => {
                       <IconAction
                         icon="edit"
                         label="Edit"
-                        onPress={() => handleStartEdit(todo)}
+                        onPress={() => handleStartEdit(priority)}
                       />
                       <IconAction
                         icon="delete-outline"
                         label="Delete"
-                        onPress={() => removeTodo(todo.id)}
+                        onPress={() => removePriority(priority.id)}
                       />
                     </>
                   )}
@@ -282,21 +298,30 @@ const FocusFlowScreen = () => {
               </View>
             );
           })}
-          {state.todos.length === 0 ? (
-            <Text style={styles.emptyState}>
-              No todos yet. Add a focus task to kickstart your loop.
-            </Text>
+          {today.priorities.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                No priorities yet. Add one here, or set your top 3 in the morning check-in.
+              </Text>
+              {!today.checkIn ? (
+                <Button
+                  label="Check in"
+                  onPress={() => navigation.navigate('CheckIn')}
+                  theme={theme}
+                  variant="secondary"
+                />
+              ) : null}
+            </View>
           ) : null}
         </Card>
         <InfoCard
-          icon="emoji-events"
-          title="Streak tracker"
-          message={streakMessage}
+          icon="timer"
+          title="Focus today"
+          message={`${dailyContext.focusMinutes} of ${FOCUS_GOAL_MINUTES} minutes across ${sessionCount} ${
+            sessionCount === 1 ? 'session' : 'sessions'
+          }.`}
           theme={theme}
         />
-        {allTodosComplete ? (
-          <Button label="Reset day & keep streak" onPress={handleResetDay} theme={theme} />
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -329,11 +354,30 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     color: theme.ink
   },
+  targetBlock: {
+    alignSelf: 'stretch',
+    marginTop: spacing.xl
+  },
+  targetLabel: {
+    marginBottom: spacing.sm,
+    fontSize: fontSize.caption,
+    color: colors.inkMuted
+  },
+  targetChips: {
+    justifyContent: 'flex-start'
+  },
+  targetSingle: {
+    alignSelf: 'stretch',
+    marginTop: spacing.xl,
+    textAlign: 'center',
+    fontSize: fontSize.body,
+    color: colors.inkMuted
+  },
   timerControls: {
     flexDirection: 'row',
     alignSelf: 'stretch',
     gap: spacing.sm,
-    marginTop: spacing.xxl
+    marginTop: spacing.xl
   },
   primaryControl: {
     flex: 1
@@ -361,32 +405,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  todoItem: {
+  priorityItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center'
+  },
+  priorityDivider: {
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border
   },
-  todoToggle: {
+  priorityToggle: {
     marginRight: spacing.md
   },
-  todoText: {
+  priorityText: {
     flex: 1,
     fontSize: fontSize.body,
     color: colors.ink
   },
-  todoTextCompleted: {
+  priorityTextCompleted: {
     textDecorationLine: 'line-through',
     color: colors.inkSubtle
   },
-  todoInput: {
+  priorityInput: {
     flex: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
-  todoActions: {
+  priorityActions: {
     flexDirection: 'row',
     marginLeft: spacing.sm
   },
@@ -395,7 +441,10 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs
   },
   emptyState: {
-    marginTop: spacing.md,
+    gap: spacing.md,
+    marginTop: spacing.md
+  },
+  emptyText: {
     fontSize: fontSize.caption,
     lineHeight: 18,
     color: colors.inkMuted

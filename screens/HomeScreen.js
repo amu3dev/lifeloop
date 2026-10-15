@@ -1,20 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView
-} from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import ProgressRing from '../components/shared/ProgressRing';
-import { useAppContext } from '../context/AppContext';
-import { MEAL_STORAGE_KEY } from '../modules/meal-mood/MealMoodScreen';
+import IconButton from '../components/shared/IconButton';
+import { FOCUS_GOAL_MINUTES, useAppContext } from '../context/AppContext';
+import { getMoodOption } from '../lib/checkInOptions';
+import { fromDateKey, getLoopAnchors } from '../lib/loopTime';
 import {
   colors,
   fontSize,
@@ -24,21 +18,7 @@ import {
   statThemes
 } from '../theme/theme';
 
-const FOCUS_GOAL = 4;
 const STREAK_WEEK = 7;
-
-const MOOD_ICONS = {
-  Happy: 'sentiment-satisfied-alt',
-  Tired: 'bedtime',
-  Hungry: 'restaurant'
-};
-
-const MODULES = [
-  { key: 'MindGym', label: 'Mind Gym', icon: 'psychology' },
-  { key: 'MealMood', label: 'Meal Mood', icon: 'restaurant-menu' },
-  { key: 'SmartWallet', label: 'Smart Wallet', icon: 'account-balance-wallet' },
-  { key: 'FocusFlow', label: 'Focus Flow', icon: 'hourglass-empty' }
-];
 
 const getGreeting = date => {
   const hour = date.getHours();
@@ -51,12 +31,47 @@ const getGreeting = date => {
   return 'Good evening';
 };
 
-// Shows today's progress at a glance and links into each module.
+// Picks the one thing the user should do next in today's loop.
+const getNextAction = ({ today, anchors, now }) => {
+  const nextPriority = today.priorities.find(priority => !priority.completed);
+
+  if (today.review) {
+    return {
+      icon: 'check-circle',
+      label: 'Loop closed',
+      title: 'Nice work. See you tomorrow.',
+      action: null
+    };
+  }
+  if (!today.checkIn) {
+    return {
+      icon: 'wb-twilight',
+      label: now < anchors.checkInAt ? `Check-in opens ${anchors.checkInLabel}` : 'Start your day',
+      title: 'Check in and pick your top 3',
+      action: { label: 'Check in', icon: 'arrow-forward', route: 'CheckIn' }
+    };
+  }
+  if (now >= anchors.reviewAt || !nextPriority) {
+    return {
+      icon: 'nights-stay',
+      label: now >= anchors.reviewAt ? 'Time to wind down' : 'Top 3 done',
+      title: 'Close your day with a quick review',
+      action: { label: 'Review', icon: 'arrow-forward', route: 'Review' }
+    };
+  }
+  return {
+    icon: 'track-changes',
+    label: 'Up next',
+    title: nextPriority.title,
+    action: { label: '25 min', icon: 'play-arrow', route: 'FocusFlow' }
+  };
+};
+
+// "Your day": loop status, the next step, today's top 3, and focus progress.
 const HomeScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const isFocused = useIsFocused();
-  const { state } = useAppContext();
-  const [mealTitle, setMealTitle] = useState(null);
+  const { state, now, today, todayKey, dailyContext, streak, togglePriority } = useAppContext();
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -66,73 +81,49 @@ const HomeScreen = ({ navigation }) => {
     }).start();
   }, [fadeAnim]);
 
-  // Re-reads the latest meal suggestion whenever Home comes back into view.
-  useFocusEffect(
-    useCallback(() => {
-      AsyncStorage.getItem(MEAL_STORAGE_KEY)
-        .then(stored => {
-          setMealTitle(stored ? JSON.parse(stored).title : null);
-        })
-        .catch(error => console.warn('Failed to read meal suggestion', error));
-    }, [])
-  );
-
-  const now = new Date();
-  const dateLabel = now.toLocaleDateString(undefined, {
+  const anchors = getLoopAnchors(state.settings, todayKey);
+  const next = getNextAction({ today, anchors, now });
+  const dateLabel = fromDateKey(todayKey).toLocaleDateString(undefined, {
     weekday: 'long',
     day: 'numeric',
     month: 'long'
   });
 
-  const completedTodos = state.todos.filter(todo => todo.completed).length;
-  const totalTodos = state.todos.length;
-  const focusSessions = state.focusSessionsToday ?? 0;
-  const streakDaysFilled = Math.min(state.streaks, STREAK_WEEK);
-  const nextTodo = state.todos.find(todo => !todo.completed);
-
-  const moduleDetails = useMemo(() => {
-    const [latestWallet] = state.walletHistory;
-    const walletDetail =
-      typeof latestWallet?.profitPercent === 'number'
-        ? `${latestWallet.profitPercent}% on ${latestWallet.name}`
-        : 'Log a margin';
-
-    return {
-      MindGym: 'Guess 1 to 100',
-      MealMood: mealTitle ?? 'Get a meal idea',
-      SmartWallet: walletDetail,
-      FocusFlow: `${focusSessions * 25} min today`
-    };
-  }, [state.walletHistory, mealTitle, focusSessions]);
+  const completed = today.priorities.filter(priority => priority.completed).length;
+  const total = today.priorities.length;
+  const mood = getMoodOption(today.checkIn?.mood);
+  const loopSteps = [
+    { label: 'Check-in', done: Boolean(today.checkIn), route: 'CheckIn' },
+    { label: 'Focus', done: dailyContext.focusMinutes > 0, route: 'FocusFlow' },
+    { label: 'Review', done: Boolean(today.review), route: 'Review' }
+  ];
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
       {isFocused ? <StatusBar style="dark" /> : null}
       <Animated.View style={[styles.animatedContainer, { opacity: fadeAnim }]}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.greetingRow}>
-            <Text style={styles.dateLabel}>{dateLabel}</Text>
-            <Text style={styles.greeting}>{getGreeting(now)}</Text>
+            <View style={styles.greetingText}>
+              <Text style={styles.dateLabel}>{dateLabel}</Text>
+              <Text style={styles.greeting}>{getGreeting(now)}</Text>
+            </View>
+            <IconButton
+              icon="tune"
+              label="Settings"
+              onPress={() => navigation.navigate('Settings')}
+            />
           </View>
 
           <View style={styles.hero}>
             <View style={styles.heroStreak}>
               <View style={styles.heroLabelRow}>
-                <MaterialIcons
-                  name="local-fire-department"
-                  size={14}
-                  color={colors.streak}
-                />
-                <Text style={styles.heroLabel}>Current streak</Text>
+                <MaterialIcons name="local-fire-department" size={14} color={colors.streak} />
+                <Text style={styles.heroLabel}>Loop streak</Text>
               </View>
               <Text style={styles.heroValue}>
-                {state.streaks}
-                <Text style={styles.heroUnit}>
-                  {state.streaks === 1 ? ' day' : ' days'}
-                </Text>
+                {streak}
+                <Text style={styles.heroUnit}>{streak === 1 ? ' day' : ' days'}</Text>
               </Text>
               <View style={styles.streakBar}>
                 {Array.from({ length: STREAK_WEEK }, (_, index) => (
@@ -140,16 +131,55 @@ const HomeScreen = ({ navigation }) => {
                     key={index}
                     style={[
                       styles.streakSegment,
-                      index < streakDaysFilled && styles.streakSegmentFilled
+                      index < Math.min(streak, STREAK_WEEK) && styles.streakSegmentFilled
                     ]}
                   />
                 ))}
               </View>
             </View>
-            <View style={styles.heroPoints}>
-              <Text style={styles.heroLabel}>Points today</Text>
-              <Text style={styles.heroValue}>{state.points}</Text>
+            <View style={styles.heroSteps}>
+              {loopSteps.map(step => (
+                <TouchableOpacity
+                  key={step.label}
+                  style={styles.heroStep}
+                  onPress={() => navigation.navigate(step.route)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${step.label}${step.done ? ', done' : ''}`}
+                >
+                  <MaterialIcons
+                    name={step.done ? 'check-circle' : 'radio-button-unchecked'}
+                    size={16}
+                    color={step.done ? colors.positive : colors.heroDivider}
+                  />
+                  <Text style={[styles.heroStepLabel, step.done && styles.heroStepDone]}>
+                    {step.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
+          </View>
+
+          <View style={styles.nextCard}>
+            <View style={styles.nextIcon}>
+              <MaterialIcons name={next.icon} size={20} color={moduleThemes.Loop.accent} />
+            </View>
+            <View style={styles.nextText}>
+              <Text style={styles.nextLabel}>{next.label}</Text>
+              <Text style={styles.nextTitle} numberOfLines={2}>
+                {next.title}
+              </Text>
+            </View>
+            {next.action ? (
+              <TouchableOpacity
+                style={styles.nextButton}
+                onPress={() => navigation.navigate(next.action.route)}
+                activeOpacity={0.85}
+              >
+                <MaterialIcons name={next.action.icon} size={16} color={colors.surface} />
+                <Text style={styles.nextButtonLabel}>{next.action.label}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <View style={styles.statRow}>
@@ -159,13 +189,13 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.85}
             >
               <ProgressRing
-                progress={totalTodos ? completedTodos / totalTodos : 0}
-                label={`${completedTodos}/${totalTodos}`}
+                progress={total ? completed / total : 0}
+                label={`${completed}/${total}`}
                 trackColor={statThemes.todos.track}
                 fillColor={statThemes.todos.fill}
                 labelColor={statThemes.todos.ink}
               />
-              <Text style={styles.statLabel}>Todos</Text>
+              <Text style={styles.statLabel}>Top 3</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.statTile}
@@ -173,88 +203,74 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.85}
             >
               <ProgressRing
-                progress={focusSessions / FOCUS_GOAL}
-                label={`${focusSessions}/${FOCUS_GOAL}`}
+                progress={dailyContext.focusMinutes / FOCUS_GOAL_MINUTES}
+                label={`${dailyContext.focusMinutes}`}
                 trackColor={statThemes.focus.track}
                 fillColor={statThemes.focus.fill}
                 labelColor={statThemes.focus.ink}
               />
-              <Text style={styles.statLabel}>Focus blocks</Text>
+              <Text style={styles.statLabel}>Focus min</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.statTile}
-              onPress={() => navigation.navigate('MealMood')}
+              onPress={() => navigation.navigate('CheckIn')}
               activeOpacity={0.85}
             >
               <View style={styles.moodBadge}>
                 <MaterialIcons
-                  name={MOOD_ICONS[state.todayMood] ?? 'add-reaction'}
+                  name={mood?.icon ?? 'add-reaction'}
                   size={26}
                   color={statThemes.mood.ink}
                 />
               </View>
               <Text style={styles.statLabel} numberOfLines={1}>
-                {state.todayMood ? `Feeling ${state.todayMood.toLowerCase()}` : 'Set mood'}
+                {today.checkIn ? `Energy ${today.checkIn.energy}/5` : 'Check in'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.upNext}>
-            <View style={styles.upNextIcon}>
-              <MaterialIcons
-                name="track-changes"
-                size={20}
-                color={moduleThemes.FocusFlow.accent}
-              />
-            </View>
-            <View style={styles.upNextText}>
-              <Text style={styles.upNextLabel}>Up next</Text>
-              <Text style={styles.upNextTitle} numberOfLines={1}>
-                {nextTodo ? nextTodo.title : totalTodos ? 'All todos done' : 'Add your first todo'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.upNextButton}
-              onPress={() => navigation.navigate('FocusFlow')}
-              activeOpacity={0.85}
-            >
-              <MaterialIcons
-                name={nextTodo ? 'play-arrow' : 'add'}
-                size={16}
-                color={colors.surface}
-              />
-              <Text style={styles.upNextButtonLabel}>
-                {nextTodo ? '25 min' : 'Add'}
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's top 3</Text>
+            {today.checkIn ? (
+              <TouchableOpacity onPress={() => navigation.navigate('CheckIn')} hitSlop={8}>
+                <Text style={styles.sectionAction}>Edit</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
-
-          <Text style={styles.sectionTitle}>Your modules</Text>
-          <View style={styles.moduleGrid}>
-            {MODULES.map(module => {
-              const theme = moduleThemes[module.key];
-
-              return (
+          <View style={styles.priorityCard}>
+            {total === 0 ? (
+              <Text style={styles.emptyText}>
+                Your top 3 will show here after your morning check-in.
+              </Text>
+            ) : (
+              today.priorities.map((priority, index) => (
                 <TouchableOpacity
-                  key={module.key}
-                  style={[styles.moduleTile, { backgroundColor: theme.background }]}
-                  onPress={() => navigation.navigate(module.key)}
-                  activeOpacity={0.85}
+                  key={priority.id}
+                  style={[styles.priorityRow, index > 0 && styles.priorityDivider]}
+                  onPress={() => togglePriority(priority.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: priority.completed }}
                 >
-                  <MaterialIcons name={module.icon} size={24} color={theme.accent} />
-                  <Text style={[styles.moduleLabel, { color: theme.ink }]}>
-                    {module.label}
-                  </Text>
+                  <MaterialIcons
+                    name={priority.completed ? 'check-circle' : 'radio-button-unchecked'}
+                    size={22}
+                    color={priority.completed ? statThemes.todos.fill : colors.border}
+                  />
                   <Text
-                    style={[styles.moduleDetail, { color: theme.accent }]}
+                    style={[styles.priorityTitle, priority.completed && styles.priorityDone]}
                     numberOfLines={1}
                   >
-                    {moduleDetails[module.key]}
+                    {priority.title}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
+              ))
+            )}
           </View>
+
+          <Text style={styles.footnote}>
+            Review {anchors.reviewLabel}
+            {state.settings.timingMode === 'prayer' ? '' : ' · change times in settings'}
+          </Text>
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
@@ -274,9 +290,14 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl
   },
   greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.xs,
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg
+  },
+  greetingText: {
+    flex: 1
   },
   dateLabel: {
     fontSize: fontSize.caption,
@@ -332,11 +353,66 @@ const styles = StyleSheet.create({
   streakSegmentFilled: {
     backgroundColor: colors.streak
   },
-  heroPoints: {
-    alignItems: 'flex-end',
+  heroSteps: {
+    gap: spacing.sm,
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderLeftColor: colors.heroDivider,
     paddingLeft: spacing.lg
+  },
+  heroStep: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  heroStepLabel: {
+    marginLeft: spacing.xs,
+    fontSize: fontSize.caption,
+    color: colors.heroMuted
+  },
+  heroStepDone: {
+    color: colors.heroText
+  },
+  nextCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md
+  },
+  nextIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: moduleThemes.Loop.background
+  },
+  nextText: {
+    flex: 1,
+    marginHorizontal: spacing.md
+  },
+  nextLabel: {
+    fontSize: fontSize.caption,
+    color: colors.inkMuted
+  },
+  nextTitle: {
+    fontSize: fontSize.body,
+    fontWeight: '600',
+    color: colors.ink
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: moduleThemes.Loop.accent,
+    borderRadius: radius.pill,
+    paddingVertical: 7,
+    paddingHorizontal: spacing.md
+  },
+  nextButtonLabel: {
+    marginLeft: 2,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.surface
   },
   statRow: {
     flexDirection: 'row',
@@ -365,77 +441,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: statThemes.mood.background
   },
-  upNext: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md
-  },
-  upNextIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: moduleThemes.FocusFlow.background
-  },
-  upNextText: {
-    flex: 1,
-    marginHorizontal: spacing.md
-  },
-  upNextLabel: {
-    fontSize: fontSize.caption,
-    color: colors.inkMuted
-  },
-  upNextTitle: {
-    fontSize: fontSize.body,
-    fontWeight: '600',
-    color: colors.ink
-  },
-  upNextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: moduleThemes.FocusFlow.accent,
-    borderRadius: radius.pill,
-    paddingVertical: 7,
-    paddingHorizontal: spacing.md
-  },
-  upNextButtonLabel: {
-    marginLeft: 2,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.surface
-  },
-  sectionTitle: {
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     marginTop: spacing.xxl,
     marginBottom: spacing.md,
-    marginHorizontal: spacing.xs,
+    marginHorizontal: spacing.xs
+  },
+  sectionTitle: {
     fontSize: fontSize.heading,
     fontWeight: '600',
     color: colors.ink
   },
-  moduleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between'
-  },
-  moduleTile: {
-    width: '48.5%',
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm
-  },
-  moduleLabel: {
-    marginTop: spacing.sm,
+  sectionAction: {
     fontSize: fontSize.body,
-    fontWeight: '600'
+    fontWeight: '600',
+    color: moduleThemes.FocusFlow.accent
   },
-  moduleDetail: {
-    marginTop: 2,
-    fontSize: fontSize.caption
+  priorityCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs
+  },
+  priorityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md
+  },
+  priorityDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border
+  },
+  priorityTitle: {
+    flex: 1,
+    marginLeft: spacing.md,
+    fontSize: fontSize.body,
+    color: colors.ink
+  },
+  priorityDone: {
+    textDecorationLine: 'line-through',
+    color: colors.inkSubtle
+  },
+  emptyText: {
+    paddingVertical: spacing.md,
+    fontSize: fontSize.caption,
+    lineHeight: 17,
+    color: colors.inkMuted
+  },
+  footnote: {
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.caption,
+    color: colors.inkSubtle
   }
 });
 
