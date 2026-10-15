@@ -15,6 +15,7 @@ import MealMoodScreen from './modules/meal-mood/MealMoodScreen';
 import SmartWalletScreen from './modules/smart-wallet/SmartWalletScreen';
 import FocusFlowScreen from './modules/focus-flow/FocusFlowScreen';
 import BottomNav from './components/shared/BottomNav';
+import { colors, moduleThemes } from './theme/theme';
 
 // Configures navigation primitives for the app shell.
 const Stack = createNativeStackNavigator();
@@ -40,25 +41,25 @@ const ModuleTabs = ({ initialRouteName }) => (
     tabBar={(props) => <BottomNav {...props} />}
     screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveTintColor: '#38bdf8',
-      tabBarInactiveTintColor: '#94a3b8',
-      tabBarStyle: { backgroundColor: '#0f172a', borderTopWidth: 0 },
+      tabBarActiveTintColor: colors.ink,
+      tabBarInactiveTintColor: colors.inkSubtle,
+      tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, elevation: 0 },
       tabBarIcon: ({ color, size }) => {
         const iconMap = {
-          Home: 'dashboard',
+          Home: 'home',
           MindGym: 'psychology',
           MealMood: 'restaurant-menu',
-          SmartWallet: 'savings',
-          FocusFlow: 'timer'
+          SmartWallet: 'account-balance-wallet',
+          FocusFlow: 'hourglass-empty'
         };
         return <MaterialIcons name={iconMap[route.name]} size={size} color={color} />;
       }
     })}>
     <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-    <Tab.Screen name="MindGym" component={MindGymScreen} options={{ title: 'Mind Gym' }} />
-    <Tab.Screen name="MealMood" component={MealMoodScreen} options={{ title: 'Meal Mood' }} />
-    <Tab.Screen name="SmartWallet" component={SmartWalletScreen} options={{ title: 'Smart Wallet' }} />
-    <Tab.Screen name="FocusFlow" component={FocusFlowScreen} options={{ title: 'Focus Flow' }} />
+    <Tab.Screen name="MindGym" component={MindGymScreen} options={{ title: 'Mind' }} />
+    <Tab.Screen name="MealMood" component={MealMoodScreen} options={{ title: 'Meals' }} />
+    <Tab.Screen name="SmartWallet" component={SmartWalletScreen} options={{ title: 'Wallet' }} />
+    <Tab.Screen name="FocusFlow" component={FocusFlowScreen} options={{ title: 'Focus' }} />
   </Tab.Navigator>
 );
 
@@ -93,7 +94,7 @@ const AppNavigation = () => {
   if (!isBootstrapped || !isHydrated) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#0f172a" />
+        <ActivityIndicator size="large" color={moduleThemes.FocusFlow.accent} />
         <Text style={styles.loaderText}>Preparing LifeLoop...</Text>
       </View>
     );

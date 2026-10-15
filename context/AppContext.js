@@ -14,6 +14,7 @@ const initialState = {
   points: 0,
   streaks: 0,
   todayMood: '',
+  focusSessionsToday: 0,
   walletHistory: [],
   todos: []
 };
@@ -74,10 +75,20 @@ export const AppProvider = ({ children }) => {
       points: 0,
       streaks: prev.streaks + 1,
       todayMood: '',
+      focusSessionsToday: 0,
       todos: prev.todos.map(todo => ({
         ...todo,
         completed: false
       }))
+    }));
+  }, []);
+
+  // Rewards a finished focus block and counts it toward today's goal.
+  const completeFocusSession = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      points: prev.points + 5,
+      focusSessionsToday: (prev.focusSessionsToday ?? 0) + 1
     }));
   }, []);
 
@@ -178,6 +189,7 @@ export const AppProvider = ({ children }) => {
       isHydrated,
       addPoints,
       resetDay,
+      completeFocusSession,
       addWalletEntry,
       addTodo,
       updateTodo,
@@ -190,6 +202,7 @@ export const AppProvider = ({ children }) => {
       isHydrated,
       addPoints,
       resetDay,
+      completeFocusSession,
       addWalletEntry,
       addTodo,
       updateTodo,

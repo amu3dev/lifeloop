@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BottomTabBar } from '@react-navigation/bottom-tabs';
+import { colors, spacing } from '../../theme/theme';
 
-// Wraps the default BottomTabBar to give consistent padding and elevation.
+// Wraps the default BottomTabBar with a light surface and hairline divider.
 const BottomNav = (props) => {
   return (
     <View style={styles.container}>
@@ -11,20 +12,12 @@ const BottomNav = (props) => {
   );
 };
 
-// Applies light theming to match the rest of the app shell.
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0f172a',
-    paddingTop: 8,
-    paddingBottom: 4,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 12,
-    overflow: 'hidden'
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xs
   }
 });
 

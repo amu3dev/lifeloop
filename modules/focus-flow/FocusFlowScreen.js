@@ -31,7 +31,7 @@ const FocusFlowScreen = () => {
     updateTodo,
     removeTodo,
     toggleTodo,
-    addPoints,
+    completeFocusSession,
     resetDay
   } = useAppContext();
   const [newTodo, setNewTodo] = useState('');
@@ -60,7 +60,7 @@ const FocusFlowScreen = () => {
 
     if (remainingSeconds === 0) {
       if (timerPhase === 'focus') {
-        addPoints(5);
+        completeFocusSession();
         setTimerPhase('break');
         setRemainingSeconds(BREAK_DURATION);
       } else {
@@ -68,7 +68,7 @@ const FocusFlowScreen = () => {
         setRemainingSeconds(FOCUS_DURATION);
       }
     }
-  }, [remainingSeconds, timerPhase, isRunning, addPoints]);
+  }, [remainingSeconds, timerPhase, isRunning, completeFocusSession]);
 
   const handleAddTodo = useCallback(() => {
     const trimmed = newTodo.trim();

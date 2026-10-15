@@ -11,7 +11,7 @@ import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
 import { useAppContext } from '../../context/AppContext';
 
-const MEAL_STORAGE_KEY = '@lifeloop/meal-mood/latest';
+export const MEAL_STORAGE_KEY = '@lifeloop/meal-mood/latest';
 
 // Rough set of healthy meal ideas to rotate through.
 const MEAL_OPTIONS = [
