@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,9 @@ import {
   TouchableOpacity,
   FlatList
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
 import { useAppContext } from '../../context/AppContext';
-
-const WALLET_STORAGE_KEY = '@lifeloop/wallet/history';
 
 const COMPETITOR_MARGINS = [
   { id: 'shop-a', name: 'LoopMart', profitPercent: 18 },
@@ -26,7 +23,6 @@ const SmartWalletScreen = () => {
   const [productName, setProductName] = useState('');
   const [cost, setCost] = useState('');
   const [retail, setRetail] = useState('');
-  const [history, setHistory] = useState(state.walletHistory);
   const [comparisonMessage, setComparisonMessage] = useState(
     'Log your product margins to gauge progress.'
   );
@@ -38,39 +34,6 @@ const SmartWalletScreen = () => {
     );
     return Math.round(total / COMPETITOR_MARGINS.length);
   }, []);
-
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(WALLET_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length && !state.walletHistory.length) {
-            parsed
-              .slice()
-              .reverse()
-              .forEach(entry => {
-                addWalletEntry(entry);
-              });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to hydrate wallet history', error);
-      }
-    };
-
-    loadHistory();
-  }, [addWalletEntry, state.walletHistory.length]);
-
-  useEffect(() => {
-    setHistory(state.walletHistory);
-  }, [state.walletHistory]);
-
-  useEffect(() => {
-    AsyncStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(history)).catch(
-      error => console.warn('Failed to persist wallet history', error)
-    );
-  }, [history]);
 
   const handleAddEntry = useCallback(() => {
     const trimmedName = productName.trim();
@@ -159,7 +122,7 @@ const SmartWalletScreen = () => {
         </View>
         <Text style={styles.historyTitle}>Recent margins</Text>
         <FlatList
-          data={history}
+          data={state.walletHistory}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (

@@ -175,6 +175,7 @@ export const AppProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       state,
+      isHydrated,
       addPoints,
       resetDay,
       addWalletEntry,
@@ -186,6 +187,7 @@ export const AppProvider = ({ children }) => {
     }),
     [
       state,
+      isHydrated,
       addPoints,
       resetDay,
       addWalletEntry,

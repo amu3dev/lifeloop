@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Shared context and components.
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useAppContext } from './context/AppContext';
 import HomeScreen from './screens/HomeScreen';
 import MindGymScreen from './modules/mind-gym/MindGymScreen';
 import MealMoodScreen from './modules/meal-mood/MealMoodScreen';
@@ -64,6 +64,7 @@ const ModuleTabs = ({ initialRouteName }) => (
 
 // Coordinates persistence of the last visited tab using AsyncStorage.
 const AppNavigation = () => {
+  const { isHydrated } = useAppContext();
   const [initialTab, setInitialTab] = useState('Home');
   const [isBootstrapped, setIsBootstrapped] = useState(false);
 
@@ -88,7 +89,8 @@ const AppNavigation = () => {
     }
   };
 
-  if (!isBootstrapped) {
+  // Holds the UI until saved state loads so early actions are not overwritten.
+  if (!isBootstrapped || !isHydrated) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#0f172a" />
