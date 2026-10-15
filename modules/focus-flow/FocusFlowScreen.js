@@ -4,13 +4,27 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
+import Card from '../../components/shared/Card';
+import Button from '../../components/shared/Button';
+import TextField from '../../components/shared/TextField';
+import ProgressRing from '../../components/shared/ProgressRing';
 import { useAppContext } from '../../context/AppContext';
+import {
+  colors,
+  fontSize,
+  moduleThemes,
+  radius,
+  spacing,
+  statThemes
+} from '../../theme/theme';
+
+const theme = moduleThemes.FocusFlow;
 
 const FOCUS_DURATION = 25 * 60;
 const BREAK_DURATION = 5 * 60;
@@ -22,6 +36,19 @@ const formatTime = seconds => {
   const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
   return `${minutes}:${remainingSeconds}`;
 };
+
+// Small icon-only button for todo row actions.
+const IconAction = ({ icon, label, onPress, color = colors.inkSubtle }) => (
+  <TouchableOpacity
+    style={styles.iconAction}
+    onPress={onPress}
+    hitSlop={8}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
+    <MaterialIcons name={icon} size={20} color={color} />
+  </TouchableOpacity>
+);
 
 // Runs a todo-driven Pomodoro loop that syncs streaks with the global context.
 const FocusFlowScreen = () => {
@@ -133,37 +160,65 @@ const FocusFlowScreen = () => {
     handleTimerReset();
   }, [resetDay, handleTimerReset]);
 
+  const phaseDuration = timerPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+
   return (
-    <View style={styles.container}>
-      <Header title="Focus Flow" subtitle="Move through deep work with ease" />
-      <ScrollView contentContainerStyle={styles.content}>
-        <InfoCard
-          icon="timer"
-          title="Pomodoro timer"
-          message={`Phase: ${timerPhase.toUpperCase()} • Remaining: ${formatTime(
-            remainingSeconds
-          )}`}
-        />
-        <View style={styles.timerControls}>
-          <TouchableOpacity style={styles.controlButton} onPress={handleTimerToggle}>
-            <Text style={styles.controlLabel}>{isRunning ? 'Pause' : 'Start'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.controlButton} onPress={handleTimerReset}>
-            <Text style={styles.controlLabel}>Reset</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Todo loop</Text>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
+        <Header title="Focus Flow" subtitle="Move through deep work with ease" theme={theme} />
+        <Card style={styles.timerCard}>
+          <ProgressRing
+            progress={remainingSeconds / phaseDuration}
+            size={220}
+            strokeWidth={12}
+            trackColor={theme.background}
+            fillColor={theme.accent}
+          >
+            <Text style={styles.timerPhase}>
+              {timerPhase === 'focus' ? 'Focus' : 'Break'}
+            </Text>
+            <Text style={styles.timerValue}>{formatTime(remainingSeconds)}</Text>
+          </ProgressRing>
+          <View style={styles.timerControls}>
+            <Button
+              label={isRunning ? 'Pause' : 'Start'}
+              icon={isRunning ? 'pause' : 'play-arrow'}
+              onPress={handleTimerToggle}
+              theme={theme}
+              style={styles.primaryControl}
+            />
+            <Button
+              label="Reset"
+              icon="replay"
+              onPress={handleTimerReset}
+              theme={theme}
+              variant="secondary"
+            />
+          </View>
+        </Card>
+        <Text style={styles.sectionTitle}>Todo loop</Text>
+        <Card>
           <View style={styles.addRow}>
-            <TextInput
+            <TextField
               style={styles.input}
               placeholder="Add a focus task"
               value={newTodo}
               onChangeText={setNewTodo}
               onSubmitEditing={handleAddTodo}
             />
-            <TouchableOpacity style={styles.addButton} onPress={handleAddTodo}>
-              <MaterialIcons name="add" size={20} color="#f8fafc" />
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddTodo}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Add todo"
+            >
+              <MaterialIcons name="add" size={22} color={colors.surface} />
             </TouchableOpacity>
           </View>
           {state.todos.map(todo => {
@@ -178,11 +233,11 @@ const FocusFlowScreen = () => {
                   <MaterialIcons
                     name={todo.completed ? 'check-circle' : 'radio-button-unchecked'}
                     size={24}
-                    color={todo.completed ? '#16a34a' : '#94a3b8'}
+                    color={todo.completed ? statThemes.todos.fill : colors.border}
                   />
                 </TouchableOpacity>
                 {isEditing ? (
-                  <TextInput
+                  <TextField
                     style={styles.todoInput}
                     value={editingValue}
                     onChangeText={setEditingValue}
@@ -201,33 +256,26 @@ const FocusFlowScreen = () => {
                 <View style={styles.todoActions}>
                   {isEditing ? (
                     <>
-                      <TouchableOpacity
-                        style={styles.actionButton}
+                      <IconAction
+                        icon="check"
+                        label="Save"
                         onPress={handleSaveEdit}
-                      >
-                        <Text style={styles.actionText}>Save</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={handleCancelEdit}
-                      >
-                        <Text style={styles.actionText}>Cancel</Text>
-                      </TouchableOpacity>
+                        color={theme.accent}
+                      />
+                      <IconAction icon="close" label="Cancel" onPress={handleCancelEdit} />
                     </>
                   ) : (
                     <>
-                      <TouchableOpacity
-                        style={styles.actionButton}
+                      <IconAction
+                        icon="edit"
+                        label="Edit"
                         onPress={() => handleStartEdit(todo)}
-                      >
-                        <Text style={styles.actionText}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionButton}
+                      />
+                      <IconAction
+                        icon="delete-outline"
+                        label="Delete"
                         onPress={() => removeTodo(todo.id)}
-                      >
-                        <Text style={styles.actionText}>Delete</Text>
-                      </TouchableOpacity>
+                      />
                     </>
                   )}
                 </View>
@@ -239,132 +287,118 @@ const FocusFlowScreen = () => {
               No todos yet. Add a focus task to kickstart your loop.
             </Text>
           ) : null}
-        </View>
-        <InfoCard icon="emoji-events" title="Streak tracker" message={streakMessage} />
+        </Card>
+        <InfoCard
+          icon="emoji-events"
+          title="Streak tracker"
+          message={streakMessage}
+          theme={theme}
+        />
         {allTodosComplete ? (
-          <TouchableOpacity style={styles.resetButton} onPress={handleResetDay}>
-            <Text style={styles.resetButtonLabel}>Reset day & keep streak</Text>
-          </TouchableOpacity>
+          <Button label="Reset day & keep streak" onPress={handleResetDay} theme={theme} />
         ) : null}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef2ff'
+    backgroundColor: colors.background
   },
   content: {
-    padding: 24
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl
+  },
+  timerCard: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl
+  },
+  timerPhase: {
+    fontSize: fontSize.caption,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.accent
+  },
+  timerValue: {
+    fontSize: fontSize.hero,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: theme.ink
   },
   timerControls: {
     flexDirection: 'row',
-    marginTop: 16,
-    justifyContent: 'space-between'
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+    marginTop: spacing.xxl
   },
-  controlButton: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginRight: 12
-  },
-  controlLabel: {
-    color: '#f8fafc',
-    fontWeight: '600',
-    fontSize: 16
-  },
-  section: {
-    marginTop: 32
+  primaryControl: {
+    flex: 1
   },
   sectionTitle: {
-    fontSize: 16,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.heading,
     fontWeight: '600',
-    color: '#0f172a'
+    color: colors.ink
   },
   addRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16
+    alignItems: 'center'
   },
   input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc'
+    flex: 1
   },
   addButton: {
-    marginLeft: 12,
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    padding: 12,
+    marginLeft: spacing.sm,
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    backgroundColor: theme.accent,
     alignItems: 'center',
     justifyContent: 'center'
   },
   todoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: '#cbd5f5'
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border
   },
   todoToggle: {
-    marginRight: 12
+    marginRight: spacing.md
   },
   todoText: {
     flex: 1,
-    fontSize: 15,
-    color: '#0f172a'
+    fontSize: fontSize.body,
+    color: colors.ink
   },
   todoTextCompleted: {
     textDecorationLine: 'line-through',
-    color: '#64748b'
-  },
-  todoActions: {
-    flexDirection: 'row'
-  },
-  actionButton: {
-    marginLeft: 8
-  },
-  actionText: {
-    color: '#0f172a',
-    fontWeight: '600'
-  },
-  emptyState: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#64748b'
+    color: colors.inkSubtle
   },
   todoInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc'
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
   },
-  resetButton: {
-    marginTop: 24,
-    backgroundColor: '#0f172a',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center'
+  todoActions: {
+    flexDirection: 'row',
+    marginLeft: spacing.sm
   },
-  resetButtonLabel: {
-    color: '#f8fafc',
-    fontWeight: '600',
-    fontSize: 16
+  iconAction: {
+    padding: spacing.xs,
+    marginLeft: spacing.xs
+  },
+  emptyState: {
+    marginTop: spacing.md,
+    fontSize: fontSize.caption,
+    lineHeight: 18,
+    color: colors.inkMuted
   }
 });
 

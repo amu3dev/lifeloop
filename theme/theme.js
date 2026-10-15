@@ -50,5 +50,6 @@ export const fontSize = {
   body: 15,
   heading: 17,
   title: 24,
-  display: 34
+  display: 34,
+  hero: 56
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-// Draws a circular progress indicator with a centred label.
+// Draws a circular progress indicator with a centred label, or custom centred children.
 const ProgressRing = ({
   progress,
   label,
@@ -10,7 +10,8 @@ const ProgressRing = ({
   strokeWidth = 6,
   trackColor,
   fillColor,
-  labelColor
+  labelColor,
+  children
 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -43,7 +44,9 @@ const ProgressRing = ({
         ) : null}
       </Svg>
       <View style={styles.labelWrap}>
-        <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+        {children ?? (
+          <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+        )}
       </View>
     </View>
   );

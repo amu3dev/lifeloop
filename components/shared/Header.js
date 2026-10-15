@@ -1,36 +1,36 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { colors, fontSize, spacing } from '../../theme/theme';
 
-// Renders a branded header that can be shared between screens.
-const Header = ({ title, subtitle }) => {
+// Renders a large module title on the page background, tinted with the module accent.
+const Header = ({ title, subtitle, theme }) => {
+  const isFocused = useIsFocused();
+
   return (
-    <SafeAreaView edges={['top']} style={styles.wrapper}>
-      <View>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      </View>
-    </SafeAreaView>
+    <View style={styles.wrapper}>
+      {isFocused ? <StatusBar style="dark" /> : null}
+      <Text style={[styles.title, { color: theme.accent }]}>{title}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    </View>
   );
 };
 
-// Defines visual tokens for the header presentation.
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    paddingTop: 12
+    paddingHorizontal: spacing.xs,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#f8fafc'
+    fontSize: fontSize.title,
+    fontWeight: '600'
   },
   subtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#cbd5f5'
+    marginTop: 2,
+    fontSize: fontSize.caption,
+    color: colors.inkMuted
   }
 });
 

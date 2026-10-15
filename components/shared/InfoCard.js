@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { colors, fontSize, radius, spacing } from '../../theme/theme';
 
 // Displays a concise card with an icon and message for quick status updates.
-const InfoCard = ({ icon = 'info', title, message }) => {
+const InfoCard = ({ icon = 'info', title, message, theme }) => {
   return (
     <View style={styles.card}>
-      <MaterialIcons name={icon} size={28} color="#0f172a" style={styles.icon} />
+      <View style={[styles.iconBadge, { backgroundColor: theme.background }]}>
+        <MaterialIcons name={icon} size={20} color={theme.accent} />
+      </View>
       <View style={styles.content}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
@@ -15,31 +18,35 @@ const InfoCard = ({ icon = 'info', title, message }) => {
   );
 };
 
-// Crafts a reusable visual layout for module summaries.
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg
   },
-  icon: {
-    marginRight: 12
+  iconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md
   },
   content: {
     flex: 1
   },
   title: {
-    fontSize: 16,
+    fontSize: fontSize.body,
     fontWeight: '600',
-    color: '#0f172a'
+    color: colors.ink
   },
   message: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#1e293b'
+    marginTop: 2,
+    fontSize: fontSize.body,
+    lineHeight: 21,
+    color: colors.inkMuted
   }
 });
 

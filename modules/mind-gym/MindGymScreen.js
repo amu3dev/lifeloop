@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity
-} from 'react-native';
+import { Text, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
+import Card from '../../components/shared/Card';
+import Button from '../../components/shared/Button';
+import TextField from '../../components/shared/TextField';
 import { useAppContext } from '../../context/AppContext';
+import { colors, fontSize, moduleThemes, spacing } from '../../theme/theme';
+
+const theme = moduleThemes.MindGym;
 
 const generateTarget = () => Math.floor(Math.random() * 100) + 1;
 
@@ -59,17 +59,23 @@ const MindGymScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Header title="Mind Gym" subtitle="Prime your mindset for the day" />
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
+        <Header title="Mind Gym" subtitle="Prime your mindset for the day" theme={theme} />
         <InfoCard
           icon="psychology"
           title="Focus Warm Up"
           message={pointsMessage}
+          theme={theme}
         />
-        <View style={styles.gameCard}>
+        <Card>
           <Text style={styles.instructions}>{feedback}</Text>
-          <TextInput
+          <TextField
             style={styles.input}
             keyboardType="number-pad"
             placeholder="Enter your guess"
@@ -77,55 +83,30 @@ const MindGymScreen = () => {
             onChangeText={setGuess}
             returnKeyType="done"
           />
-          <TouchableOpacity style={styles.button} onPress={handleGuess}>
-            <Text style={styles.buttonLabel}>Submit Guess</Text>
-          </TouchableOpacity>
-        </View>
+          <Button label="Submit Guess" onPress={handleGuess} theme={theme} />
+        </Card>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc'
+    backgroundColor: colors.background
   },
   content: {
-    padding: 24
-  },
-  gameCard: {
-    marginTop: 24,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 20
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl
   },
   instructions: {
-    fontSize: 15,
+    fontSize: fontSize.body,
     lineHeight: 22,
-    color: '#1e293b'
+    color: theme.ink
   },
   input: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#0f172a'
-  },
-  button: {
-    marginTop: 16,
-    backgroundColor: '#0f172a',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  buttonLabel: {
-    color: '#f8fafc',
-    fontWeight: '600',
-    fontSize: 16
+    marginVertical: spacing.lg
   }
 });
 

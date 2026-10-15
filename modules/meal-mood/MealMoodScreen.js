@@ -6,10 +6,22 @@ import {
   ScrollView,
   TouchableOpacity
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../../components/shared/Header';
-import InfoCard from '../../components/shared/InfoCard';
+import Card from '../../components/shared/Card';
+import Button from '../../components/shared/Button';
 import { useAppContext } from '../../context/AppContext';
+import {
+  colors,
+  fontSize,
+  moduleThemes,
+  radius,
+  spacing
+} from '../../theme/theme';
+
+const theme = moduleThemes.MealMood;
 
 export const MEAL_STORAGE_KEY = '@lifeloop/meal-mood/latest';
 
@@ -94,21 +106,36 @@ const MealMoodScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Header title="Meal Mood" subtitle="Plan meals that match your energy" />
-      <ScrollView contentContainerStyle={styles.content}>
-        <InfoCard
-          icon="restaurant"
-          title="Suggested Pairing"
-          message={
-            isLoading || !currentMeal
-              ? 'Loading meal inspiration...'
-              : `${currentMeal.title} — ${currentMeal.description}`
-          }
-        />
-        <TouchableOpacity style={styles.button} onPress={handleNewMeal}>
-          <Text style={styles.buttonLabel}>New Meal</Text>
-        </TouchableOpacity>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Header title="Meal Mood" subtitle="Plan meals that match your energy" theme={theme} />
+        <Card>
+          <View style={styles.mealLabelRow}>
+            <View style={styles.mealIcon}>
+              <MaterialIcons name="restaurant" size={20} color={theme.accent} />
+            </View>
+            <Text style={styles.mealLabel}>Suggested Pairing</Text>
+          </View>
+          {isLoading || !currentMeal ? (
+            <Text style={styles.mealDescription}>Loading meal inspiration...</Text>
+          ) : (
+            <>
+              <Text style={styles.mealTitle}>{currentMeal.title}</Text>
+              <Text style={styles.mealDescription}>{currentMeal.description}</Text>
+            </>
+          )}
+          <Button
+            label="New Meal"
+            icon="refresh"
+            onPress={handleNewMeal}
+            theme={theme}
+            variant="secondary"
+            style={styles.newMealButton}
+          />
+        </Card>
         <Text style={styles.sectionTitle}>How are you feeling?</Text>
         <View style={styles.moodRow}>
           {['Happy', 'Tired', 'Hungry'].map(mood => {
@@ -119,6 +146,7 @@ const MealMoodScreen = () => {
                 key={mood}
                 style={[styles.moodChip, isActive && styles.moodChipActive]}
                 onPress={() => handleMoodChange(mood)}
+                activeOpacity={0.85}
               >
                 <Text
                   style={[
@@ -137,64 +165,88 @@ const MealMoodScreen = () => {
           across the app.
         </Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9'
+    backgroundColor: colors.background
   },
   content: {
-    padding: 24
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl
   },
-  note: {
-    marginTop: 24,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#1e293b'
-  },
-  button: {
-    marginTop: 24,
-    backgroundColor: '#0f172a',
-    paddingVertical: 12,
-    borderRadius: 12,
+  mealLabelRow: {
+    flexDirection: 'row',
     alignItems: 'center'
   },
-  buttonLabel: {
-    color: '#f8fafc',
+  mealIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.background,
+    marginRight: spacing.md
+  },
+  mealLabel: {
+    fontSize: fontSize.caption,
+    color: colors.inkMuted
+  },
+  mealTitle: {
+    marginTop: spacing.md,
+    fontSize: fontSize.heading,
     fontWeight: '600',
-    fontSize: 16
+    color: theme.ink
+  },
+  mealDescription: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.body,
+    lineHeight: 21,
+    color: colors.inkMuted
+  },
+  newMealButton: {
+    marginTop: spacing.lg
   },
   sectionTitle: {
-    marginTop: 32,
-    fontSize: 16,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.heading,
     fontWeight: '600',
-    color: '#0f172a'
+    color: colors.ink
   },
   moodRow: {
     flexDirection: 'row',
-    marginTop: 16
+    gap: spacing.sm
   },
   moodChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#64748b',
-    marginRight: 12
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
   },
   moodChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a'
+    backgroundColor: theme.accent,
+    borderColor: theme.accent
   },
   moodChipLabel: {
-    color: '#0f172a',
-    fontWeight: '500'
+    fontSize: fontSize.body,
+    fontWeight: '500',
+    color: colors.ink
   },
   moodChipLabelActive: {
-    color: '#f8fafc'
+    color: colors.surface
+  },
+  note: {
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.caption,
+    lineHeight: 18,
+    color: colors.inkMuted
   }
 });
 

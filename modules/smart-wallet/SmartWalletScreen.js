@@ -1,15 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../../components/shared/Header';
 import InfoCard from '../../components/shared/InfoCard';
+import Card from '../../components/shared/Card';
+import Button from '../../components/shared/Button';
+import TextField from '../../components/shared/TextField';
 import { useAppContext } from '../../context/AppContext';
+import {
+  colors,
+  fontSize,
+  moduleThemes,
+  radius,
+  spacing
+} from '../../theme/theme';
+
+const theme = moduleThemes.SmartWallet;
 
 const COMPETITOR_MARGINS = [
   { id: 'shop-a', name: 'LoopMart', profitPercent: 18 },
@@ -86,151 +92,144 @@ const SmartWalletScreen = () => {
   }, [productName, cost, retail, addWalletEntry, competitorAverage]);
 
   return (
-    <View style={styles.container}>
-      <Header title="Smart Wallet" subtitle="Stay on top of your spend" />
-      <View style={styles.content}>
-        <InfoCard
-          icon="account-balance-wallet"
-          title="Competitor Benchmark"
-          message={`Average competitor margin: ${competitorAverage}%. ${comparisonMessage}`}
-        />
-        <View style={styles.form}>
-          <Text style={styles.formTitle}>Add Product Margin</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Product name"
-            value={productName}
-            onChangeText={setProductName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Cost"
-            keyboardType="decimal-pad"
-            value={cost}
-            onChangeText={setCost}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Retail price"
-            keyboardType="decimal-pad"
-            value={retail}
-            onChangeText={setRetail}
-          />
-          <TouchableOpacity style={styles.button} onPress={handleAddEntry}>
-            <Text style={styles.buttonLabel}>Save entry</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.historyTitle}>Recent margins</Text>
-        <FlatList
-          data={state.walletHistory}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.historyItem}>
-              <View style={styles.historyTextGroup}>
-                <Text style={styles.historyName}>{item.name}</Text>
-                <Text style={styles.historyMeta}>
-                  Cost ${item.cost.toFixed(2)} • Retail ${item.retail.toFixed(2)}
-                </Text>
-              </View>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <FlatList
+        data={state.walletHistory}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Header title="Smart Wallet" subtitle="Stay on top of your spend" theme={theme} />
+            <InfoCard
+              icon="account-balance-wallet"
+              title="Competitor Benchmark"
+              message={`Average competitor margin: ${competitorAverage}%. ${comparisonMessage}`}
+              theme={theme}
+            />
+            <Card style={styles.form}>
+              <Text style={styles.formTitle}>Add Product Margin</Text>
+              <TextField
+                placeholder="Product name"
+                value={productName}
+                onChangeText={setProductName}
+              />
+              <TextField
+                placeholder="Cost"
+                keyboardType="decimal-pad"
+                value={cost}
+                onChangeText={setCost}
+              />
+              <TextField
+                placeholder="Retail price"
+                keyboardType="decimal-pad"
+                value={retail}
+                onChangeText={setRetail}
+              />
+              <Button
+                label="Save entry"
+                onPress={handleAddEntry}
+                theme={theme}
+                style={styles.saveButton}
+              />
+            </Card>
+            <Text style={styles.historyTitle}>Recent margins</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.historyItem}>
+            <View style={styles.historyTextGroup}>
+              <Text style={styles.historyName}>{item.name}</Text>
+              <Text style={styles.historyMeta}>
+                Cost ${item.cost.toFixed(2)} • Retail ${item.retail.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.historyProfitBadge}>
               <Text style={styles.historyProfit}>{item.profitPercent}%</Text>
             </View>
-          )}
-          ListEmptyComponent={
-            <Text style={styles.emptyState}>
-              No entries tracked yet. Add one to start modeling your wallet loop.
-            </Text>
-          }
-        />
-      </View>
-    </View>
+          </View>
+        )}
+        ListEmptyComponent={
+          <Text style={styles.emptyState}>
+            No entries tracked yet. Add one to start modeling your wallet loop.
+          </Text>
+        }
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc'
+    backgroundColor: colors.background
   },
   content: {
-    flex: 1,
-    padding: 24
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl
+  },
+  listHeader: {
+    gap: spacing.md,
+    marginBottom: spacing.md
   },
   form: {
-    marginTop: 24,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 20
+    gap: spacing.md
   },
   formTitle: {
-    fontSize: 16,
+    fontSize: fontSize.body,
     fontWeight: '600',
-    color: '#0f172a'
+    color: colors.ink
   },
-  input: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc'
-  },
-  button: {
-    marginTop: 16,
-    backgroundColor: '#0f172a',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  buttonLabel: {
-    color: '#f8fafc',
-    fontWeight: '600',
-    fontSize: 16
+  saveButton: {
+    marginTop: spacing.xs
   },
   historyTitle: {
-    marginTop: 24,
-    fontSize: 16,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.heading,
     fontWeight: '600',
-    color: '#0f172a'
-  },
-  listContent: {
-    paddingVertical: 16
+    color: colors.ink
   },
   historyItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 12
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm
   },
   historyTextGroup: {
     flex: 1
   },
   historyName: {
-    fontSize: 15,
+    fontSize: fontSize.body,
     fontWeight: '600',
-    color: '#0f172a'
+    color: colors.ink
   },
   historyMeta: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#475569'
+    marginTop: 2,
+    fontSize: fontSize.caption,
+    color: colors.inkMuted
+  },
+  historyProfitBadge: {
+    backgroundColor: theme.background,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md
   },
   historyProfit: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#16a34a'
+    fontSize: fontSize.body,
+    fontWeight: '600',
+    color: theme.accent
   },
   emptyState: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#475569'
+    marginHorizontal: spacing.xs,
+    fontSize: fontSize.caption,
+    lineHeight: 18,
+    color: colors.inkMuted
   }
 });
 
