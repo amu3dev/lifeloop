@@ -1,10 +1,12 @@
 # LifeLoop: Ecosystem Concept
 
-Status: all open decisions resolved on 2026-10-15. Nothing here is built yet.
+Status (2026-10-16): the standalone Phase 1 daily loop is implemented. LifeLoop 0.2 adds storage recovery guards, persistent timers, stable session/day attribution, strict DailyContext validation, optional low-energy focus suggestions and seven-day local history. Automated tests and iOS/Android bundle exports pass; device validation and the two-week daily-use exit criterion remain unverified.
+
+The ecosystem connections, event transport, reminders, cross-app context and later phases below are future plans, not implemented capabilities. The current app stays useful on its own: continuity over productivity.
 
 ## 1. Why we are rethinking LifeLoop
 
-Today LifeLoop is four unrelated tools behind one tab bar:
+Before the daily-loop implementation, LifeLoop was four unrelated tools behind one tab bar:
 
 | Module | What it promises | What it actually does |
 |---|---|---|
@@ -13,7 +15,7 @@ Today LifeLoop is four unrelated tools behind one tab bar:
 | Smart Wallet | "Stay on top of your spend" | A product-margin calculator against hard-coded competitors |
 | Focus Flow | Pomodoro + todos | Exactly that, and the only module with real daily value |
 
-There is no loop: no module feeds another, the points reward a guessing game, and the target user is unclear.
+That earlier version had no loop: no module fed another, points rewarded a guessing game, and the target user was unclear. The standalone daily loop has since replaced it.
 
 ## 2. The new idea in one sentence
 
@@ -34,6 +36,8 @@ It must still be worth opening on its own. A context hub that only feeds other a
 SignalBoard, the consulting site, BrewAndBean and OriginAndOak are business projects and are out of scope.
 
 ## 4. The daily loop
+
+Check-in, top 3, focus and review are implemented locally. References below to nominations, cross-app events, handoffs and longer-term patterns describe future ecosystem behavior. In 0.2, energy 1–2 offers an optional 15-minute focus block (otherwise 25), with five-minute breaks. Today shows the last seven loop days using existing local records. A check-in and review are both required to close a loop; focus is optional. Open forms and active timers keep their owning loop date across 04:00/Fajr.
 
 1. **Morning check-in (about 30 s):** energy 1–5, mood, sleep quality, and today's top 3 (suggested from Focus Galaxy, confirmed by the user). Optionally opened right after morning adhkar in Zekr.
 2. **During the day:** focus sessions against the top 3 (today's Focus Flow, kept and improved).
@@ -92,6 +96,8 @@ type LoopEvent = {
 ```
 
 Deliberately minimal. No free-text journal and no counts or content from Zekr beyond "a session was completed". Fields are added only when a consuming app needs them.
+
+The v0 validator now checks real calendar dates, ISO timestamps, supported enums and priority sources/fields, and finite non-negative focus minutes. Schema version remains 0. `dayLoad` retains the existing total-effort thresholds (1–3 light, 4–6 normal, 7+ heavy; absent with no priorities). A single large priority therefore maps to light. Changing this to reflect individual intensity remains a product decision, not an implicit rule change.
 
 ### Where the contract lives (decided 2026-10-15)
 
@@ -179,4 +185,4 @@ The visual redesign done so far (theme tokens, shared Header/Card/Button/TextFie
 4. ~~**Healthy Meal changes**~~ Decided: it stays deterministic, context is added as an input, and the meal locks once chosen (see section 6).
 5. ~~**Zekr**~~ Decided: an opt-in, off-by-default handoff carrying only `kind=morning`, plus the non-profit rule (see sections 6 and 7).
 
-All open decisions are resolved. Next step: Phase 1, the Loop MVP.
+The original ecosystem decisions above remain resolved. Phase 1 implementation exists; sustained daily-use validation remains open. The 0.2 dayLoad semantics question is deferred as noted in section 5. Ecosystem integrations remain future work.

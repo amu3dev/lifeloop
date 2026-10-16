@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '../components/shared/Header';
@@ -8,6 +8,8 @@ import Button from '../components/shared/Button';
 import IconButton from '../components/shared/IconButton';
 import OptionChips from '../components/shared/OptionChips';
 import { useAppContext } from '../context/AppContext';
+import { buildDailyContext } from '../contract/dailyContext';
+import { getLoopDateKey } from '../lib/loopTime';
 import { getMoodOption, MOOD_OPTIONS } from '../lib/checkInOptions';
 import { colors, fontSize, moduleThemes, radius, spacing, statThemes } from '../theme/theme';
 
@@ -15,7 +17,11 @@ const theme = moduleThemes.Loop;
 
 // Evening review: mark what got done and how the day felt, which closes the loop.
 const ReviewScreen = ({ navigation }) => {
-  const { today, dailyContext, submitReview } = useAppContext();
+  const { state, todayKey, submitReview } = useAppContext();
+  const [draftDate] = useState(() => getLoopDateKey(state.settings));
+  const today = { priorities: [], ...state.days[draftDate] };
+  const dailyContext = buildDailyContext(draftDate, today);
+  const dayChanged = todayKey !== draftDate || getLoopDateKey(state.settings) !== draftDate;
   const [feeling, setFeeling] = useState(today.review?.feeling);
   // Ticks stay a draft until "Close the loop", so closing with ✕ changes nothing.
   const [doneIds, setDoneIds] = useState(
@@ -36,9 +42,20 @@ const ReviewScreen = ({ navigation }) => {
   const doneCount = today.priorities.filter(priority => doneIds.has(priority.id)).length;
   const morningMood = getMoodOption(today.checkIn?.mood);
 
-  const handleSubmit = () => {
-    submitReview({ feeling, completedIds: [...doneIds] });
+  const saveDraft = () => {
+    submitReview({ date: draftDate, feeling, completedIds: [...doneIds] });
     navigation.goBack();
+  };
+
+  const handleSubmit = () => {
+    if (getLoopDateKey(state.settings) !== draftDate) {
+      Alert.alert('A new loop day has started', `Your input is kept. Save this draft to ${draftDate}?`, [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: `Save to ${draftDate}`, onPress: saveDraft }
+      ]);
+      return;
+    }
+    saveDraft();
   };
 
   return (
@@ -46,11 +63,12 @@ const ReviewScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Header
           title={today.review ? 'Your review' : 'Close your day'}
-          subtitle="Mark what got done and how it felt"
+          subtitle={`Mark what got done and how it felt · ${draftDate}`}
           theme={theme}
           right={<IconButton icon="close" label="Close" onPress={() => navigation.goBack()} />}
         />
 
+        {dayChanged ? <Text style={styles.hint}>A new loop day has started. This draft will still save to {draftDate}; your input is kept.</Text> : null}
         <View style={styles.summaryRow}>
           <View style={styles.summaryTile}>
             <Text style={styles.summaryValue}>

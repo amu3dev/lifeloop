@@ -84,37 +84,42 @@ export const buildDailyContext = (date, day = {}) => {
   return context;
 };
 
+// Round-trip the calendar portion to reject normalization of dates such as February 30.
+export const isCalendarDate = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+const isTimestamp = value => {
+  if (typeof value !== 'string') return false;
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.\d+)?(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/);
+  return Boolean(match && isCalendarDate(match[1]) && Number.isFinite(Date.parse(value)));
+};
+
 // Returns a list of problems; an empty list means the context is valid.
 export const validateDailyContext = context => {
   const errors = [];
-
-  if (!context || typeof context !== 'object') {
-    return ['context must be an object'];
+  if (!context || typeof context !== 'object' || Array.isArray(context)) return ['context must be an object'];
+  if (context.schemaVersion !== SCHEMA_VERSION) errors.push(`schemaVersion must be ${SCHEMA_VERSION}`);
+  if (!isCalendarDate(context.date)) errors.push('date must be YYYY-MM-DD');
+  for (const key of ['checkedInAt', 'reviewedAt']) {
+    if (context[key] !== undefined && !isTimestamp(context[key])) errors.push(`${key} must be an ISO timestamp`);
   }
-  if (context.schemaVersion !== SCHEMA_VERSION) {
-    errors.push(`schemaVersion must be ${SCHEMA_VERSION}`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(context.date ?? '')) {
-    errors.push('date must be YYYY-MM-DD');
-  }
-  if (context.energy !== undefined && !ENERGY_LEVELS.includes(context.energy)) {
-    errors.push('energy must be 1-5');
-  }
-  if (context.mood !== undefined && !MOODS.includes(context.mood)) {
-    errors.push(`mood must be one of ${MOODS.join(', ')}`);
-  }
-  if (context.sleep !== undefined && !SLEEP_LEVELS.includes(context.sleep)) {
-    errors.push(`sleep must be one of ${SLEEP_LEVELS.join(', ')}`);
-  }
-  if (context.dayLoad !== undefined && !DAY_LOADS.includes(context.dayLoad)) {
-    errors.push(`dayLoad must be one of ${DAY_LOADS.join(', ')}`);
-  }
+  if (context.energy !== undefined && !ENERGY_LEVELS.includes(context.energy)) errors.push('energy must be 1-5');
+  if (context.mood !== undefined && !MOODS.includes(context.mood)) errors.push(`mood must be one of ${MOODS.join(', ')}`);
+  if (context.sleep !== undefined && !SLEEP_LEVELS.includes(context.sleep)) errors.push(`sleep must be one of ${SLEEP_LEVELS.join(', ')}`);
+  if (context.dayLoad !== undefined && !DAY_LOADS.includes(context.dayLoad)) errors.push(`dayLoad must be one of ${DAY_LOADS.join(', ')}`);
   if (!Array.isArray(context.topPriorities)) {
     errors.push('topPriorities must be an array');
+  } else if (context.topPriorities.some(priority =>
+    !priority || typeof priority !== 'object' || Array.isArray(priority) ||
+    typeof priority.id !== 'string' || !priority.id.trim() ||
+    typeof priority.title !== 'string' || !priority.title.trim() ||
+    !['lifeloop', 'focus-galaxy'].includes(priority.source)
+  )) {
+    errors.push('topPriorities must contain priorities with id, title and supported source');
   }
-  if (typeof context.focusMinutes !== 'number' || context.focusMinutes < 0) {
-    errors.push('focusMinutes must be a non-negative number');
-  }
-
+  if (!Number.isFinite(context.focusMinutes) || context.focusMinutes < 0) errors.push('focusMinutes must be a non-negative number');
   return errors;
 };

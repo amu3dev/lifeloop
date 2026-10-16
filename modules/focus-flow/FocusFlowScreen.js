@@ -18,14 +18,10 @@ import TextField from '../../components/shared/TextField';
 import ProgressRing from '../../components/shared/ProgressRing';
 import { FOCUS_GOAL_MINUTES, MAX_PRIORITIES, useAppContext } from '../../context/AppContext';
 import {
-  FOCUS_DURATION,
-  advanceTimer,
-  createTimer,
+  getSuggestedFocusMinutes,
   getPhaseDuration,
   getRemainingSeconds,
-  isTimerRunning,
-  pauseTimer,
-  startTimer
+  isTimerRunning
 } from '../../lib/focusTimer';
 import {
   colors,
@@ -68,17 +64,20 @@ const FocusFlowScreen = ({ navigation }) => {
     updatePriority,
     removePriority,
     togglePriority,
-    completeFocusSession
+    timer,
+    toggleTimer,
+    resetTimer,
+    selectDuration
   } = useAppContext();
   const [newPriority, setNewPriority] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const [timer, setTimer] = useState(createTimer);
-  const [clock, setClock] = useState(() => Date.now());
+
+  const [, setClock] = useState(() => Date.now());
 
   const isRunning = isTimerRunning(timer);
-  const remainingSeconds = getRemainingSeconds(timer, clock);
+  const remainingSeconds = getRemainingSeconds(timer, Date.now());
 
   const openPriorities = today.priorities.filter(priority => !priority.completed);
   // Falls back to the first open priority when the chosen one is done or removed.
@@ -104,18 +103,6 @@ const FocusFlowScreen = ({ navigation }) => {
       subscription.remove();
     };
   }, [isRunning]);
-
-  useEffect(() => {
-    if (!isRunning || remainingSeconds > 0) {
-      return;
-    }
-
-    const { timer: nextTimer, completedFocus } = advanceTimer(timer, Date.now());
-    if (completedFocus) {
-      completeFocusSession({ minutes: FOCUS_DURATION / 60, priorityId: focusTargetId });
-    }
-    setTimer(nextTimer);
-  }, [isRunning, remainingSeconds, timer, completeFocusSession, focusTargetId]);
 
   // Return-key submits pass the field's own text, which can be newer than `newPriority`.
   const handleAddPriority = useCallback(text => {
@@ -150,15 +137,16 @@ const FocusFlowScreen = ({ navigation }) => {
     setEditingValue('');
   }, []);
 
-  const handleTimerToggle = useCallback(() => {
-    const now = Date.now();
-    setClock(now);
-    setTimer(prev => (isTimerRunning(prev) ? pauseTimer(prev, now) : startTimer(prev, now)));
-  }, []);
-
-  const handleTimerReset = useCallback(() => {
-    setTimer(createTimer());
-  }, []);
+  const handleTimerToggle = () => {
+    setClock(Date.now());
+    toggleTimer(focusTargetId);
+  };
+  const handleTimerReset = () => {
+    setClock(Date.now());
+    resetTimer();
+  };
+  const canSelectDuration = !isRunning && timer.phase === 'focus' && !timer.session;
+  const suggestedMinutes = getSuggestedFocusMinutes(today.checkIn);
 
   const timerPhase = timer.phase;
   const phaseDuration = getPhaseDuration(timer);
@@ -174,6 +162,22 @@ const FocusFlowScreen = ({ navigation }) => {
       >
         <Header title="Focus" subtitle="Work through today's top 3" theme={theme} />
         <Card style={styles.timerCard}>
+          {canSelectDuration ? (
+            <View style={styles.targetBlock}>
+              {suggestedMinutes === 15 ? (
+                <Text style={styles.targetLabel}>Low energy today? Start with a 15-minute focus session.</Text>
+              ) : null}
+              <OptionChips
+                options={[{ value: 15, label: '15 min' }, { value: 25, label: '25 min' }]}
+                value={timer.focusDuration / 60}
+                onChange={selectDuration}
+                theme={theme}
+              />
+            </View>
+          ) : null}
+          {timer.session ? (
+            <Text style={styles.targetLabel}>{timer.phase === 'focus' ? 'This block' : 'Last block'}: {timer.session.priorityTitle ?? 'Open focus'} · {timer.session.date}</Text>
+          ) : null}
           <ProgressRing
             progress={remainingSeconds / phaseDuration}
             size={220}
@@ -186,7 +190,7 @@ const FocusFlowScreen = ({ navigation }) => {
             </Text>
             <Text style={styles.timerValue}>{formatTime(remainingSeconds)}</Text>
           </ProgressRing>
-          {openPriorities.length > 1 ? (
+          {!timer.session && timer.phase === 'focus' && openPriorities.length > 1 ? (
             <View style={styles.targetBlock}>
               <Text style={styles.targetLabel}>Focusing on</Text>
               <OptionChips
@@ -200,7 +204,7 @@ const FocusFlowScreen = ({ navigation }) => {
                 style={styles.targetChips}
               />
             </View>
-          ) : openPriorities.length === 1 ? (
+          ) : !timer.session && timer.phase === 'focus' && openPriorities.length === 1 ? (
             <Text style={styles.targetSingle} numberOfLines={1}>
               Focusing on {openPriorities[0].title}
             </Text>

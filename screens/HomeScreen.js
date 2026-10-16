@@ -5,6 +5,8 @@ import { useIsFocused } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import ProgressRing from '../components/shared/ProgressRing';
+import Card from '../components/shared/Card';
+import { getSevenDayHistory } from '../lib/history';
 import IconButton from '../components/shared/IconButton';
 import { FOCUS_GOAL_MINUTES, useAppContext } from '../context/AppContext';
 import { getMoodOption } from '../lib/checkInOptions';
@@ -231,6 +233,22 @@ const HomeScreen = ({ navigation }) => {
               ))
             )}
           </View>
+
+          <Text style={[styles.sectionTitle, { marginTop: spacing.xxl, marginBottom: spacing.md }]}>Last seven loop days</Text>
+          <Card>
+            {getSevenDayHistory(state.days, todayKey).map(day => (
+              <View key={day.date} style={styles.priorityRow} accessible>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.priorityTitle}>{day.date}</Text>
+                  <Text style={styles.emptyText}>
+                    {day.hasRecord
+                      ? `Check-in: ${day.checkedIn ? 'done' : 'not recorded'} · Review: ${day.reviewed ? 'done' : 'not recorded'}\n${day.completedPriorities} priorities done · ${day.focusMinutes} focus min · Energy: ${day.energy === null ? 'not recorded' : `${day.energy}/5`}`
+                      : 'No records · Check-in, review, priorities, focus and energy not recorded'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </Card>
 
           <Text style={styles.footnote}>
             Review {anchors.reviewLabel}

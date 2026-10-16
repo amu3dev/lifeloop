@@ -15,6 +15,7 @@ import CheckInScreen from './screens/CheckInScreen';
 import ReviewScreen from './screens/ReviewScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FocusFlowScreen from './modules/focus-flow/FocusFlowScreen';
+import Button from './components/shared/Button';
 import BottomNav from './components/shared/BottomNav';
 import { colors, fontSize, moduleThemes, spacing } from './theme/theme';
 
@@ -61,7 +62,7 @@ const ModuleTabs = ({ initialRouteName }) => (
 
 // Coordinates persistence of the last visited tab using AsyncStorage.
 const AppNavigation = () => {
-  const { isHydrated, state } = useAppContext();
+  const { isHydrated, state, storageError, retryHydration, saveError, retrySave } = useAppContext();
   const [initialTab, setInitialTab] = useState('Home');
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   // A user who onboards in this launch starts on Today, not a tab saved by an older version.
@@ -78,6 +79,8 @@ const AppNavigation = () => {
         if (TAB_NAMES.includes(savedTab)) {
           setInitialTab(savedTab);
         }
+      } catch {
+        // Last-tab restoration is optional; daily records have their own recovery gate.
       } finally {
         setIsBootstrapped(true);
       }
@@ -88,9 +91,22 @@ const AppNavigation = () => {
   const handleStateChange = async (state) => {
     const currentRoute = getActiveRouteName(state);
     if (TAB_NAMES.includes(currentRoute)) {
-      await AsyncStorage.setItem(LAST_TAB_KEY, currentRoute);
+      try {
+        await AsyncStorage.setItem(LAST_TAB_KEY, currentRoute);
+      } catch {
+        // Navigation still works without a saved tab.
+      }
     }
   };
+
+  if (storageError) {
+    return (
+      <View style={[styles.loaderContainer, { padding: spacing.xl }]}>
+        <Text style={styles.loaderText}>{storageError}</Text>
+        <Button label="Try again" onPress={retryHydration} theme={moduleThemes.Loop} />
+      </View>
+    );
+  }
 
   // Holds the UI until saved state loads so early actions are not overwritten.
   if (!isBootstrapped || !isHydrated) {
@@ -104,25 +120,33 @@ const AppNavigation = () => {
 
   return (
     <NavigationContainer onStateChange={handleStateChange}>
-      <StatusBar style="dark" />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {state.settings.onboarded ? (
-          <>
-            <Stack.Screen name="LifeLoopTabs">
-              {() => (
-                <ModuleTabs initialRouteName={onboardedAtLaunch.current ? initialTab : 'Home'} />
-              )}
-            </Stack.Screen>
-            <Stack.Group screenOptions={{ presentation: 'modal' }}>
-              <Stack.Screen name="CheckIn" component={CheckInScreen} />
-              <Stack.Screen name="Review" component={ReviewScreen} />
-              <Stack.Screen name="Settings" component={SettingsScreen} />
-            </Stack.Group>
-          </>
-        ) : (
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        )}
-      </Stack.Navigator>
+      <View style={{ flex: 1 }}>
+        <StatusBar style="dark" />
+        {saveError ? (
+          <View style={{ padding: spacing.md, backgroundColor: colors.background }}>
+            <Text style={styles.loaderText}>Changes could not be saved on this device. Keep LifeLoop open and retry.</Text>
+            <Button label="Retry saving" onPress={retrySave} theme={moduleThemes.Loop} />
+          </View>
+        ) : null}
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {state.settings.onboarded ? (
+            <>
+              <Stack.Screen name="LifeLoopTabs">
+                {() => (
+                  <ModuleTabs initialRouteName={onboardedAtLaunch.current ? initialTab : 'Home'} />
+                )}
+              </Stack.Screen>
+              <Stack.Group screenOptions={{ presentation: 'modal' }}>
+                <Stack.Screen name="CheckIn" component={CheckInScreen} />
+                <Stack.Screen name="Review" component={ReviewScreen} />
+                <Stack.Screen name="Settings" component={SettingsScreen} />
+              </Stack.Group>
+            </>
+          ) : (
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          )}
+        </Stack.Navigator>
+      </View>
     </NavigationContainer>
   );
 };

@@ -54,7 +54,7 @@ const ProgressRing = ({
 
 const styles = StyleSheet.create({
   labelWrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center'
   },

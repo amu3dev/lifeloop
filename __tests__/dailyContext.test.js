@@ -59,3 +59,23 @@ describe('validateDailyContext', () => {
     expect(validateDailyContext(null)).toEqual(['context must be an object']);
   });
 });
+
+describe('strict contract validation', () => {
+  it.each([
+    { date: '2026-02-29' }, { date: '2026-04-31' }, { date: 20261015 },
+    { checkedInAt: 'yesterday' }, { reviewedAt: '2026-02-30T12:00:00Z' },
+    { checkedInAt: '2026-10-15T25:00:00Z' }, { reviewedAt: null },
+    { topPriorities: [null] }, { topPriorities: [{}] },
+    { topPriorities: [{ id: 'a', title: 'A', source: 'other' }] },
+    { topPriorities: [{ id: '', title: 'A', source: 'lifeloop' }] },
+    { topPriorities: [{ id: 'a', title: '', source: 'lifeloop' }] },
+    { focusMinutes: NaN }, { focusMinutes: Infinity }, { focusMinutes: -1 },
+    { focusMinutes: '25' }, { energy: 1.5 }, { mood: 'unknown' },
+    { sleep: 'unknown' }, { dayLoad: 'unknown' }
+  ])('rejects malformed fields: %p', patch => {
+    expect(validateDailyContext({ ...buildDailyContext('2026-10-15'), ...patch }).length).toBeGreaterThan(0);
+  });
+  it('accepts leap dates, offset timestamps and both priority sources', () => {
+    expect(validateDailyContext({ ...buildDailyContext('2028-02-29'), checkedInAt: '2028-02-29T12:00:00+02:00', topPriorities: [{ id: 'a', title: 'A', source: 'focus-galaxy' }] })).toEqual([]);
+  });
+});

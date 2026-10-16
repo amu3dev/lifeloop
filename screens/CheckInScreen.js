@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '../components/shared/Header';
@@ -15,7 +15,7 @@ import {
   MOOD_OPTIONS,
   SLEEP_OPTIONS
 } from '../lib/checkInOptions';
-import { fromDateKey } from '../lib/loopTime';
+import { fromDateKey, getLoopDateKey } from '../lib/loopTime';
 import { colors, fontSize, moduleThemes, radius, spacing } from '../theme/theme';
 
 const theme = moduleThemes.Loop;
@@ -25,7 +25,11 @@ const draftId = () => `draft-${Date.now().toString(36)}-${(draftCounter += 1)}`;
 
 // Morning check-in: how you feel plus today's top 3. Re-opening it edits today's check-in.
 const CheckInScreen = ({ navigation }) => {
-  const { today, todayKey, carryOver, submitCheckIn } = useAppContext();
+  const { state, todayKey, carryOver: currentCarryOver, submitCheckIn } = useAppContext();
+  const [draftDate] = useState(() => getLoopDateKey(state.settings));
+  const [carryOver] = useState(currentCarryOver);
+  const today = { priorities: [], ...state.days[draftDate] };
+  const dayChanged = todayKey !== draftDate || getLoopDateKey(state.settings) !== draftDate;
   const existing = today.checkIn;
 
   const [energy, setEnergy] = useState(existing?.energy);
@@ -60,8 +64,9 @@ const CheckInScreen = ({ navigation }) => {
     setNewEffort('medium');
   };
 
-  const handleSubmit = () => {
+  const saveDraft = () => {
     submitCheckIn({
+      date: draftDate,
       energy,
       mood,
       sleep,
@@ -73,11 +78,22 @@ const CheckInScreen = ({ navigation }) => {
     navigation.goBack();
   };
 
-  const dateLabel = fromDateKey(todayKey).toLocaleDateString(undefined, {
+  const dateLabel = fromDateKey(draftDate).toLocaleDateString(undefined, {
     weekday: 'long',
     day: 'numeric',
     month: 'long'
   });
+
+  const handleSubmit = () => {
+    if (getLoopDateKey(state.settings) !== draftDate) {
+      Alert.alert('A new loop day has started', `Your input is kept. Save this draft to ${draftDate}?`, [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: `Save to ${draftDate}`, onPress: saveDraft }
+      ]);
+      return;
+    }
+    saveDraft();
+  };
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
@@ -94,6 +110,7 @@ const CheckInScreen = ({ navigation }) => {
           right={<IconButton icon="close" label="Close" onPress={() => navigation.goBack()} />}
         />
 
+        {dayChanged ? <Text style={styles.hint}>A new loop day has started. This draft will still save to {draftDate}; your input is kept.</Text> : null}
         <Card style={styles.questions}>
           <View>
             <View style={styles.questionRow}>

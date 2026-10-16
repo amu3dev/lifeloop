@@ -4,43 +4,32 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState
+  useState,
+  useRef
 } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildDailyContext } from '../contract/dailyContext';
 import { getLoopDateKey, shiftDateKey } from '../lib/loopTime';
 import { getStreak } from '../lib/streak';
-
-const STORAGE_KEY = '@lifeloop/loop-state-v1';
-// Keys from the four-module version; nothing reads them since the loop redesign.
-const LEGACY_STORAGE_KEYS = ['@lifeloop/app-context', '@lifeloop/meal-mood/latest'];
+import { STORAGE_KEY, initialState, hydrateState } from '../lib/storage';
+import { createTimer } from '../lib/focusTimer';
+import {
+  EMPTY_DAY,
+  updateDay,
+  toggleFocusTimer,
+  settleFocusTimer,
+  resetFocusTimer,
+  selectFocusDuration
+} from '../lib/loopState';
 
 export const MAX_PRIORITIES = 3;
 export const FOCUS_GOAL_MINUTES = 100;
 
-const initialState = {
-  settings: {
-    onboarded: false,
-    timingMode: 'fixed',
-    wakeTime: '07:00',
-    windDownTime: '22:00',
-    cityId: 'cairo'
-  },
-  // Day records keyed by loop date (YYYY-MM-DD).
-  days: {}
-};
-
-const EMPTY_DAY = { priorities: [], focusSessions: [] };
-
 const createId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 // Applies `update` to the record of the loop day happening right now.
-const updateToday = (prev, update) => {
-  const key = getLoopDateKey(prev.settings);
-  const day = { ...EMPTY_DAY, ...prev.days[key] };
-  return { ...prev, days: { ...prev.days, [key]: update(day) } };
-};
+const updateToday = (prev, update) => updateDay(prev, getLoopDateKey(prev.settings), update);
 
 const updatePriorities = (prev, update) =>
   updateToday(prev, day => ({ ...day, priorities: update(day.priorities) }));
@@ -52,41 +41,63 @@ export const AppProvider = ({ children }) => {
   const [isHydrated, setIsHydrated] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  useEffect(() => {
-    const loadState = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  const [storageError, setStorageError] = useState(null);
+  const [saveError, setSaveError] = useState(false);
+  const [saveAttempt, setSaveAttempt] = useState(0);
+  const writeQueue = useRef(Promise.resolve());
 
-        if (stored) {
-          const parsed = JSON.parse(stored);
-
-          setState(prev => ({
-            settings: { ...prev.settings, ...parsed.settings },
-            days: parsed.days ?? {}
-          }));
-        }
-      } catch (error) {
-        console.warn('Failed to load loop state', error);
-      } finally {
-        setIsHydrated(true);
-      }
-    };
-
-    loadState();
-    AsyncStorage.multiRemove(LEGACY_STORAGE_KEYS).catch(error => {
-      console.warn('Failed to clear legacy state', error);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!isHydrated) {
+  const retryHydration = useCallback(async () => {
+    setStorageError(null);
+    const result = await hydrateState(AsyncStorage);
+    if (result.error) {
+      setStorageError(result.error);
       return;
     }
+    setState(result.state);
+    setIsHydrated(true);
+  }, []);
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(error => {
-      console.warn('Failed to persist loop state', error);
+  useEffect(() => { retryHydration(); }, [retryHydration]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    // Serialize writes so an older slow write cannot replace a newer timer/history.
+    writeQueue.current = writeQueue.current
+      .catch(() => {})
+      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)))
+      .then(() => setSaveError(false))
+      .catch(() => setSaveError(true));
+  }, [state, isHydrated, saveAttempt]);
+
+  const retrySave = useCallback(() => setSaveAttempt(value => value + 1), []);
+
+  const toggleTimer = useCallback(priorityId => {
+    const at = Date.now();
+    const id = createId();
+    setState(prev => toggleFocusTimer(prev, priorityId, at, id));
+  }, []);
+  const resetTimer = useCallback(() => {
+    const at = Date.now();
+    const id = createId();
+    setState(prev => resetFocusTimer(prev, at, id));
+  }, []);
+  const selectDuration = useCallback(minutes => setState(prev => selectFocusDuration(prev, minutes)), []);
+
+  // Provider ownership keeps timing and completion alive across screen remounts.
+  useEffect(() => {
+    if (!isHydrated) return undefined;
+    const tick = () => {
+      const at = Date.now();
+      const id = createId();
+      setState(prev => settleFocusTimer(prev, at, id));
+    };
+    tick();
+    const interval = setInterval(tick, 500);
+    const subscription = AppState.addEventListener('change', status => {
+      if (status === 'active') tick();
     });
-  }, [state, isHydrated]);
+    return () => { clearInterval(interval); subscription.remove(); };
+  }, [isHydrated]);
 
   // Keeps "today" correct across the day boundary and when the app returns to the foreground.
   useEffect(() => {
@@ -115,9 +126,9 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Records the morning check-in and today's top priorities in one step.
-  const submitCheckIn = useCallback(({ energy, mood, sleep, priorities }) => {
+  const submitCheckIn = useCallback(({ date, energy, mood, sleep, priorities }) => {
     setState(prev =>
-      updateToday(prev, day => ({
+      updateDay(prev, date ?? getLoopDateKey(prev.settings), day => ({
         ...day,
         checkIn: { at: new Date().toISOString(), energy, mood, sleep },
         priorities: priorities.slice(0, MAX_PRIORITIES).map(priority => ({
@@ -174,22 +185,10 @@ export const AppProvider = ({ children }) => {
     );
   }, []);
 
-  const completeFocusSession = useCallback(({ minutes, priorityId }) => {
-    setState(prev =>
-      updateToday(prev, day => ({
-        ...day,
-        focusSessions: [
-          ...day.focusSessions,
-          { at: new Date().toISOString(), minutes, priorityId: priorityId ?? null }
-        ]
-      }))
-    );
-  }, []);
-
   // Closes the day; `completedIds`, when given, sets which priorities are done.
-  const submitReview = useCallback(({ feeling, completedIds }) => {
+  const submitReview = useCallback(({ date, feeling, completedIds }) => {
     setState(prev =>
-      updateToday(prev, day => ({
+      updateDay(prev, date ?? getLoopDateKey(prev.settings), day => ({
         ...day,
         priorities: completedIds
           ? day.priorities.map(priority => ({
@@ -224,6 +223,11 @@ export const AppProvider = ({ children }) => {
     () => ({
       state,
       isHydrated,
+      storageError,
+      retryHydration,
+      saveError,
+      retrySave,
+      timer: state.timer ?? createTimer(),
       now,
       ...derived,
       completeOnboarding,
@@ -233,12 +237,18 @@ export const AppProvider = ({ children }) => {
       updatePriority,
       removePriority,
       togglePriority,
-      completeFocusSession,
+      toggleTimer,
+      resetTimer,
+      selectDuration,
       submitReview
     }),
     [
       state,
       isHydrated,
+      storageError,
+      retryHydration,
+      saveError,
+      retrySave,
       now,
       derived,
       completeOnboarding,
@@ -248,7 +258,9 @@ export const AppProvider = ({ children }) => {
       updatePriority,
       removePriority,
       togglePriority,
-      completeFocusSession,
+      toggleTimer,
+      resetTimer,
+      selectDuration,
       submitReview
     ]
   );

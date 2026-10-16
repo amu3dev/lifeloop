@@ -18,9 +18,10 @@ describe('getNextAction', () => {
     expect(next.label).toBe('Start your day');
   });
 
-  it('says when the check-in opens before the start time', () => {
+  it('keeps check-in available before the reminder time', () => {
     const next = getNextAction({ today: day(), anchors, now: new Date(2026, 9, 15, 6, 0) });
-    expect(next.label).toBe('Check-in opens at 7:00 AM');
+    expect(next.label).toBe('Start your day');
+    expect(next.action.route).toBe('CheckIn');
   });
 
   it('points at the first open priority during the day', () => {
@@ -59,4 +60,22 @@ describe('getNextAction', () => {
     const next = getNextAction({ today: day({ checkIn, review: { at: 'x' } }), anchors, now: night });
     expect(next.action).toBeNull();
   });
+});
+
+  it('asks for a missing check-in even when a review exists', () => {
+    const next = getNextAction({ today: day({ review: { at: 'x' } }), anchors, now: night });
+    expect(next.action.route).toBe('CheckIn');
+  });
+
+it.each([
+  [{}, false],
+  [{ checkIn }, false],
+  [{ review: { at: 'evening' } }, false],
+  [{ checkIn, review: { at: 'evening' } }, true],
+  [{ checkIn, focusSessions: [{ minutes: 25 }] }, false]
+])('uses the same completion definition as streaks for %p', (record, closed) => {
+  const { isClosed, getStreak } = require('../lib/streak');
+  expect(isClosed(record)).toBe(closed);
+  expect(getStreak({ '2026-10-15': record }, '2026-10-15')).toBe(closed ? 1 : 0);
+  expect(getNextAction({ today: day(record), anchors, now: night }).label === 'Loop closed').toBe(closed);
 });
